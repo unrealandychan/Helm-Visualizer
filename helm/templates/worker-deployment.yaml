@@ -1,0 +1,38 @@
+{{- if .Values.worker.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "webapp.fullname" . }}-worker
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "webapp.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  replicas: {{ .Values.worker.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "webapp.workerSelectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "webapp.workerSelectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "webapp.serviceAccountName" . }}
+      containers:
+        - name: {{ include "webapp.name" . }}-worker
+          image: {{ printf "%s/%s:%s" .Values.global.registry .Values.worker.image.repository (include "webapp.imageTag" .) }}
+          imagePullPolicy: {{ .Values.worker.image.pullPolicy }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "webapp.fullname" . }}-config
+            {{- if .Values.secret.create }}
+            - secretRef:
+                name: {{ include "webapp.fullname" . }}-secret
+            {{- end }}
+            {{- range .Values.app.secretRefs }}
+            - secretRef:
+                name: {{ . }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.worker.resources | nindent 12 }}
+{{- end }}

@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "webapp.fullname" . }}-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "webapp.labels" . | nindent 4 }}
+data:
+  DATABASE_HOST: {{ if .Values.postgres.enabled }}{{ printf "%s-postgres" (include "webapp.fullname" .) }}{{ else }}{{ .Values.config.database.host | quote }}{{ end }}
+  DATABASE_PORT: {{ .Values.config.database.port | quote }}
+  DATABASE_NAME: {{ .Values.config.database.name | quote }}
+  DATABASE_SSL_MODE: {{ .Values.config.database.sslMode | quote }}
+  REDIS_HOST: {{ .Values.config.redis.host | quote }}
+  REDIS_PORT: {{ .Values.config.redis.port | quote }}
+  S3_BUCKET: {{ .Values.config.s3.bucket | quote }}
+  S3_REGION: {{ .Values.config.s3.region | quote }}
+  APP_ENV: {{ .Values.app.appEnv | quote }}
+  LOG_LEVEL: {{ index .Values.app.envVars "LOG_LEVEL" | default "info" | quote }}

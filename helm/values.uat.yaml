@@ -1,0 +1,32 @@
+global:
+  imageTag: "2.4.1"
+
+app:
+  appEnv: uat
+  replicaCount: 2
+  envVars:
+    LOG_LEVEL: info
+    NODE_ENV: staging
+    FEATURE_FLAGS: "dark-mode"
+
+autoscaling:
+  enabled: false
+
+ingress:
+  host: webapp.uat.example.com
+  tls:
+    enabled: true
+    secretName: webapp-uat-tls
+
+config:
+  database:
+    host: postgres.uat.svc.cluster.local
+    name: webapp_uat
+    sslMode: require
+  redis:
+    host: redis.uat.svc.cluster.local
+  s3:
+    bucket: webapp-uat-assets
+
+worker:
+  replicaCount: 1

@@ -1,0 +1,29 @@
+global:
+  imageTag: "2.4.1"
+
+app:
+  appEnv: sit
+  replicaCount: 1
+  envVars:
+    LOG_LEVEL: info
+    NODE_ENV: staging
+    FEATURE_FLAGS: "dark-mode"
+
+autoscaling:
+  enabled: false
+
+ingress:
+  host: webapp.sit.example.com
+
+config:
+  database:
+    host: postgres.sit.svc.cluster.local
+    name: webapp_sit
+    sslMode: require
+  redis:
+    host: redis.sit.svc.cluster.local
+  s3:
+    bucket: webapp-sit-assets
+
+worker:
+  replicaCount: 1

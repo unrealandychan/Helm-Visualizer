@@ -1,0 +1,53 @@
+global:
+  imageTag: "2.4.1"
+
+app:
+  appEnv: prd
+  replicaCount: 3
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: "2"
+      memory: 2Gi
+  envVars:
+    LOG_LEVEL: warn
+    NODE_ENV: production
+    FEATURE_FLAGS: ""
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 20
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+ingress:
+  host: webapp.example.com
+  tls:
+    enabled: true
+    secretName: webapp-prd-tls
+  annotations:
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/proxy-body-size: 10m
+
+config:
+  database:
+    host: postgres.prd.svc.cluster.local
+    name: webapp_prd
+    sslMode: require
+  redis:
+    host: redis.prd.svc.cluster.local
+  s3:
+    bucket: webapp-prd-assets
+
+worker:
+  replicaCount: 3
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: "2"
+      memory: 2Gi

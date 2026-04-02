@@ -1,0 +1,167 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# Sample Helm Chart – Shared Values
+# These are defaults; environment-specific files override as needed.
+# ──────────────────────────────────────────────────────────────────────────────
+
+global:
+  # Container registry prefix (e.g., 123456789.dkr.ecr.us-east-1.amazonaws.com)
+  registry: registry.example.com
+  # Injected by CI – the image tag to deploy
+  imageTag: "2.4.1"
+  # Namespace override (leave blank to use Helm release namespace)
+  namespaceOverride: ""
+
+# ──── App ─────────────────────────────────────────────────────────────────────
+app:
+  name: webapp
+  appEnv: dev
+  replicaCount: 1
+
+  image:
+    repository: webapp/api
+    pullPolicy: IfNotPresent
+
+  containerPort: 8080
+
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+
+  livenessProbe:
+    path: /healthz
+    initialDelaySeconds: 15
+    periodSeconds: 20
+
+  readinessProbe:
+    path: /readyz
+    initialDelaySeconds: 5
+    periodSeconds: 10
+
+  # Environment variables injected into ALL pods
+  envVars:
+    LOG_LEVEL: info
+    NODE_ENV: development
+    FEATURE_FLAGS: ""
+
+  # Extra secret refs (mounted as envFrom)
+  secretRefs:
+    - webapp-env-secret
+
+# ──── Worker ──────────────────────────────────────────────────────────────────
+worker:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: webapp/worker
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+    limits:
+      cpu: "200m"
+      memory: "256Mi"
+
+# ──── Service ─────────────────────────────────────────────────────────────────
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+
+# ──── Ingress ─────────────────────────────────────────────────────────────────
+ingress:
+  enabled: true
+  className: "nginx"
+  host: webapp.dev.example.com
+  tls: false
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+
+# ──── Autoscaling ─────────────────────────────────────────────────────────────
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+# ──── Service Account ─────────────────────────────────────────────────────────
+serviceAccount:
+  create: true
+  name: webapp
+  annotations: {}
+
+# ──── Config ──────────────────────────────────────────────────────────────────
+config:
+  database:
+    host: postgres.dev.svc.cluster.local
+    port: 5432
+    name: webapp_dev
+    sslMode: disable
+  redis:
+    host: redis.dev.svc.cluster.local
+    port: 6379
+  s3:
+    bucket: webapp-dev-assets
+    region: us-east-1
+
+# ──── PostgreSQL ──────────────────────────────────────────────────────────────
+postgres:
+  enabled: true
+  image:
+    repository: postgres
+    tag: "15-alpine"
+    pullPolicy: IfNotPresent
+  dbName: webapp
+  dbUser: webapp
+  persistence:
+    enabled: true
+    size: 1Gi
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+
+# ──── Managed Secret ──────────────────────────────────────────────────────────
+secret:
+  create: true
+  databasePassword: "changeme-db-password"
+  redisPassword: ""
+  jwtSecret: "changeme-jwt-secret-32chars-min!!"
+  apiKey: "changeme-api-key"
+
+# ──── CronJobs ────────────────────────────────────────────────────────────────
+cronJobs:
+  cleanup:
+    enabled: true
+    schedule: "0 3 * * *"
+    image:
+      repository: webapp/jobs
+    command: ["node", "scripts/cleanup.js"]
+    resources:
+      requests:
+        cpu: "50m"
+        memory: "64Mi"
+      limits:
+        cpu: "100m"
+        memory: "128Mi"
+  report:
+    enabled: true
+    schedule: "0 9 * * 1"
+    image:
+      repository: webapp/jobs
+    command: ["node", "scripts/weekly-report.js"]
+    resources:
+      requests:
+        cpu: "50m"
+        memory: "64Mi"
+      limits:
+        cpu: "100m"
+        memory: "128Mi"

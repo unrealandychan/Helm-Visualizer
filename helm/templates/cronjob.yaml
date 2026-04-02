@@ -1,0 +1,39 @@
+{{- range $name, $job := .Values.cronJobs }}
+{{- if $job.enabled }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "webapp.fullname" $ }}-{{ $name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "webapp.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: cronjob-{{ $name }}
+spec:
+  schedule: {{ $job.schedule | quote }}
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            {{- include "webapp.selectorLabels" $ | nindent 12 }}
+            app.kubernetes.io/component: cronjob-{{ $name }}
+        spec:
+          restartPolicy: OnFailure
+          serviceAccountName: {{ include "webapp.serviceAccountName" $ }}
+          containers:
+            - name: {{ $name }}
+              image: {{ printf "%s/%s:%s" $.Values.global.registry $job.image.repository (include "webapp.imageTag" $) }}
+              imagePullPolicy: IfNotPresent
+              command: {{ toJson $job.command }}
+              envFrom:
+                - configMapRef:
+                    name: {{ include "webapp.fullname" $ }}-config
+                {{- if $.Values.secret.create }}
+                - secretRef:
+                    name: {{ include "webapp.fullname" $ }}-secret
+                {{- end }}
+              resources:
+                {{- toYaml $job.resources | nindent 16 }}
+{{- end }}
+{{- end }}

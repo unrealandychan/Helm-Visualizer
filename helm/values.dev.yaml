@@ -1,0 +1,31 @@
+global:
+  imageTag: "2.4.1-dev"
+
+app:
+  appEnv: dev
+  replicaCount: 1
+  envVars:
+    LOG_LEVEL: debug
+    NODE_ENV: development
+    FEATURE_FLAGS: "dark-mode,beta-api"
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+
+ingress:
+  host: webapp.dev.example.com
+
+config:
+  database:
+    host: postgres.dev.svc.cluster.local
+    name: webapp_dev
+    sslMode: disable
+  redis:
+    host: redis.dev.svc.cluster.local
+  s3:
+    bucket: webapp-dev-assets
+
+worker:
+  replicaCount: 1

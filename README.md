@@ -1,36 +1,165 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Helm Chart Visualizer
 
-## Getting Started
+An interactive, browser-based Helm chart renderer and Kubernetes resource graph — no Helm CLI, no cluster access required.
 
-First, run the development server:
+Paste an Artifact Hub URL, upload a `.tgz` chart, or load the chart from your own workspace. Switch environments, diff configs, and explore every rendered resource.
+
+![Alt text](helm-viz.png)
+
+---
+
+## Features
+
+| Feature | Description |
+|---|---|
+| **Workspace chart** | Auto-loads the `helm/` directory in the repo and renders it across all environments |
+| **Upload `.tgz`** | Drag-and-drop any packaged Helm chart for instant visualization |
+| **Artifact Hub / OCI** | Load charts directly from `artifacthub.io` URLs, including OCI-hosted charts |
+| **Search** | Live search against the Artifact Hub API; click a result to load it |
+| **Popular charts** | One-click quickload for nginx, grafana, cert-manager, and more |
+| **Multi-environment** | Renders every `values.<env>.yaml` file and lets you switch between them |
+| **Env diff** | Select a comparison environment — changed nodes glow amber |
+| **Values Inspector** | Explore the merged values tree; hover to highlight which resources use each key |
+| **Resource detail** | Click any node on the graph for a full YAML view of the resource |
+| **Export YAML** | Download the rendered manifests for the active environment |
+| **Chart history** | Recent charts persist to localStorage for quick re-access |
+| **Kind badges** | Header shows a live count of each resource kind in the active environment |
+| **Resource relationships** | Edges show how resources connect: `routes to`, `exposes`, `bound to`, `mounted by`, `referenced by` |
+| **Pure-JS renderer** | Go templates processed entirely in-browser — no server-side helm binary |
+
+---
+
+## Quick Start
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000. The workspace chart (`helm/`) is loaded automatically.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Chart Sources
 
-## Learn More
+### Workspace chart
+The app reads `helm/` at the project root. Place your `Chart.yaml`, `values.yaml`, environment-specific overrides (`values.dev.yaml`, `values.prd.yaml`, etc.), and templates there.
 
-To learn more about Next.js, take a look at the following resources:
+### Upload
+Click **Upload** and drop any `.tgz` Helm chart package (max 50 MB).
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Artifact Hub
+1. Find a chart at https://artifacthub.io
+2. Copy the package URL (e.g. `https://artifacthub.io/packages/helm/bitnami/nginx`)
+3. Paste it into the **Artifact Hub** tab and press Enter
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+OCI charts (hosted on Docker Hub, GHCR, ECR, etc.) are supported automatically.
 
-## Deploy on Vercel
+---
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Multi-Environment Rendering
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The visualizer discovers all `values.<env>.yaml` files next to `values.yaml` and renders each one. Controls appear in the env switcher bar:
+
+- Select the **active environment** to view its graph
+- Select a **diff environment** to compare — amber-highlighted nodes have changed resources
+
+---
+
+## Project Structure
+
+```
+helm-chart-visualizer/
+├── app/
+│   ├── page.tsx              # Main page — header, graph, values panel
+│   └── api/
+│       ├── workspace-chart/  # Reads helm/ from the repo
+│       ├── upload-chart/     # Accepts multipart .tgz upload
+│       ├── fetch-chart/      # Downloads and renders from URL / OCI
+│       └── search-charts/    # Proxies Artifact Hub search API
+├── components/
+│   ├── ChartLoader.tsx       # Tab-based chart input modal
+│   ├── ResourceGraph.tsx     # React Flow canvas
+│   ├── ResourceNode.tsx      # Custom node per Kubernetes kind
+│   ├── ResourceDetail.tsx    # YAML sidebar for selected node
+│   ├── ValuesInspector.tsx   # Values tree panel
+│   ├── EnvSwitcher.tsx       # Environment & diff selector
+│   └── WelcomeScreen.tsx     # Landing screen with feature highlights
+├── lib/
+│   ├── helmTemplateRenderer.ts  # Pure-JS Go template engine
+│   ├── graphBuilder.ts          # Builds React Flow nodes/edges from resources
+│   └── valuesBuilder.ts         # Extracts & annotates the values tree
+├── types/
+│   └── helm.ts               # Shared TypeScript types
+└── helm/                     # Sample workspace chart (multi-env webapp)
+    ├── Chart.yaml
+    ├── values.yaml
+    ├── values.dev.yaml
+    ├── values.sit.yaml
+    ├── values.uat.yaml
+    ├── values.prd.yaml
+    └── templates/
+        ├── _helpers.tpl
+        ├── deployment.yaml
+        ├── worker-deployment.yaml
+        ├── service.yaml
+        ├── ingress.yaml
+        ├── hpa.yaml
+        ├── serviceaccount.yaml
+        ├── configmap.yaml
+        ├── secret.yaml
+        ├── postgres.yaml
+        └── cronjob.yaml
+```
+
+---
+
+## Go Template Engine
+
+`lib/helmTemplateRenderer.ts` implements a pure-JavaScript Go template renderer — no Helm binary, no exec, no network calls at render time.
+
+Supported features:
+
+- `{{- if / else if / else / end }}`
+- `{{- range $k, $v := .Values.map }}` and indexed range
+- `{{- with }}` scoping
+- `{{- define }} / {{- template }} / {{- include }}`
+- `toYaml`, `toJson`, `indent`, `nindent`, `quote`, `default`, `required`
+- `printf` with `%s`, `%d`, `%f`, `%v`, `%q`, `%x` verbs
+- 100+ Sprig functions (`trunc`, `upper`, `lower`, `trim`, `replace`, `hasKey`, `pluck`, `merge`, `kindIs`, ...)
+- Recursive template loading from subdirectories and subcharts
+
+---
+
+## Tech Stack
+
+| Layer | Library |
+|---|---|
+| Framework | Next.js 16 (App Router) |
+| Language | TypeScript |
+| Styling | Tailwind CSS |
+| Graph | @xyflow/react v12 |
+| Layout | @dagrejs/dagre |
+| YAML | js-yaml |
+| Icons | lucide-react |
+
+---
+
+## Development
+
+```bash
+# Type-check
+npx tsc --noEmit
+
+# Build for production
+npm run build
+
+# Run production server
+npm start
+```
+
+---
+
+## License
+
+Apache 2.0 — see [LICENSE](LICENSE).

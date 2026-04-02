@@ -1,0 +1,13 @@
+apiVersion: v2
+name: webapp
+description: A sample multi-environment web application Helm chart
+type: application
+version: 1.0.0
+appVersion: "2.4.1"
+keywords:
+  - webapp
+  - api
+  - microservices
+maintainers:
+  - name: Platform Team
+    email: platform@example.com
