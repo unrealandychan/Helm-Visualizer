@@ -77,7 +77,8 @@ ingress:
   enabled: true
   className: "nginx"
   host: webapp.dev.example.com
-  tls: false
+  tls:
+    enabled: false
   annotations:
     nginx.ingress.kubernetes.io/rewrite-target: /
 
