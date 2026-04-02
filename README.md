@@ -1,6 +1,6 @@
 # Helm Chart Visualizer
 
-An interactive, browser-based Helm chart renderer and Kubernetes resource graph — no Helm CLI, no cluster access required.
+An interactive, browser-based Helm chart renderer and Kubernetes resource graph — uses Helm CLI when available, falls back to pure-JS renderer, no cluster access required.
 
 Paste an Artifact Hub URL, upload a `.tgz` chart, or load the chart from your own workspace. Switch environments, diff configs, and explore every rendered resource.
 
@@ -25,7 +25,7 @@ Paste an Artifact Hub URL, upload a `.tgz` chart, or load the chart from your ow
 | **Chart history** | Recent charts persist to localStorage for quick re-access |
 | **Kind badges** | Header shows a live count of each resource kind in the active environment |
 | **Resource relationships** | Edges show how resources connect: `routes to`, `exposes`, `bound to`, `mounted by`, `referenced by` |
-| **Pure-JS renderer** | Go templates processed entirely in-browser — no server-side helm binary |
+| **Pure-JS renderer** | Go templates processed entirely in-browser when Helm CLI unavailable — no server-side helm binary |
 
 ---
 
@@ -116,7 +116,7 @@ helm-chart-visualizer/
 
 ## Go Template Engine
 
-`lib/helmTemplateRenderer.ts` implements a pure-JavaScript Go template renderer — no Helm binary, no exec, no network calls at render time.
+`lib/helmTemplateRenderer.ts` implements a pure-JavaScript Go template renderer used as a fallback when Helm CLI is unavailable — no Helm binary, no exec, no network calls at render time.
 
 Supported features:
 
