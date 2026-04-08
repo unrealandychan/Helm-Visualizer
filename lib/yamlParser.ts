@@ -58,6 +58,33 @@ export function parseMultiDocYaml(yamlStr: string): K8sResource[] {
 }
 
 /**
+ * Pre-process template files into a Map<valuePath, filename[]> so that each
+ * values key lookup is O(1) instead of scanning every file's content.
+ */
+function buildValueToTemplateMap(
+  templateFiles: Record<string, string>
+): Map<string, string[]> {
+  const map = new Map<string, string[]>();
+  const pattern = /\.Values\.([\w.]+)/g;
+
+  for (const [filename, content] of Object.entries(templateFiles)) {
+    pattern.lastIndex = 0;
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(content)) !== null) {
+      const valuePath = match[1];
+      const existing = map.get(valuePath);
+      if (existing) {
+        if (!existing.includes(filename)) existing.push(filename);
+      } else {
+        map.set(valuePath, [filename]);
+      }
+    }
+  }
+
+  return map;
+}
+
+/**
  * Parse a values.yaml string into a flat list of ValuesEntry objects (dot-notation keys).
  */
 export function extractValuesEntries(
@@ -71,11 +98,14 @@ export function extractValuesEntries(
   const flat: Array<{ key: string; value: unknown }> = [];
   flattenObject(raw, "", flat);
 
+  // Pre-build value-path → template filenames map for O(1) per-entry lookups
+  const valueToTemplates = buildValueToTemplateMap(templateFiles);
+
   const entries: ValuesEntry[] = flat.map(({ key, value }) => ({
     key,
     value,
     type: inferType(value),
-    usedInTemplates: findKeyInTemplates(key, templateFiles),
+    usedInTemplates: findKeyInTemplates(key, valueToTemplates),
   }));
 
   return { env, raw, entries };
@@ -126,33 +156,29 @@ function inferType(value: unknown): ValuesEntry["type"] {
 
 /**
  * Given a dot-notation values key (e.g. "flavour.replicas.min"),
- * look for any usage of that key in Go templates using regex.
+ * look for any usage of that key in Go templates using the pre-built map.
  * Returns array of template file names that reference this key.
  */
 function findKeyInTemplates(
   key: string,
-  templateFiles: Record<string, string>
+  valueToTemplates: Map<string, string[]>
 ): string[] {
-  // e.g. key = "flavour.replicas.min"
-  // template usage: .Values.flavour.replicas.min
-  // also shorter partials — we check if the key's last segment appears in the template
-  const usages: string[] = [];
+  const exact = valueToTemplates.get(key) ?? [];
 
-  // Build a dotted path pattern: .Values.flavour.replicas.min
-  const valuePath = `.Values.${key}`;
-  // Also match partial final segment (last two parts) for robustness
+  // Also check shorter partial paths (last two segments) for robustness
   const keyParts = key.split(".");
-  const shortPattern = keyParts.length >= 2
-    ? `.Values.${keyParts.slice(-2).join(".")}`
-    : valuePath;
+  if (keyParts.length < 2) return exact;
 
-  for (const [filename, content] of Object.entries(templateFiles)) {
-    if (content.includes(valuePath) || content.includes(shortPattern)) {
-      usages.push(filename);
-    }
-  }
+  const shortKey = keyParts.slice(-2).join(".");
+  if (shortKey === key) return exact;
 
-  return usages;
+  const short = valueToTemplates.get(shortKey) ?? [];
+  if (short.length === 0) return exact;
+
+  // Merge without duplicates
+  const merged = new Set(exact);
+  for (const f of short) merged.add(f);
+  return Array.from(merged);
 }
 
 /**

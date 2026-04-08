@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { ChartLoader } from "@/components/ChartLoader";
 import dynamic from "next/dynamic";
 import { ValuesInspector } from "@/components/ValuesInspector";
@@ -153,7 +153,10 @@ export default function Home() {
   const currentGraph = getEnvGraph(chartResult, activeEnv);
   const currentEnvResult = getEnvResult(chartResult, activeEnv);
   const diffGraph = getEnvGraph(chartResult, diffEnv ?? "");
-  const diffNodes = useDiffNodes(currentGraph?.nodes ?? [], diffGraph?.nodes ?? []);
+  const diffNodes = useMemo(
+    () => computeDiffNodes(currentGraph?.nodes ?? [], diffGraph?.nodes ?? []),
+    [currentGraph?.nodes, diffGraph?.nodes]
+  );
   const kindCounts = getKindCounts(chartResult, activeEnv);
 
   return (
@@ -296,7 +299,7 @@ export default function Home() {
   );
 }
 
-function useDiffNodes(
+function computeDiffNodes(
   baseNodes: ResourceGraphNode[],
   compareNodes: ResourceGraphNode[]
 ): ResourceGraphNode[] {

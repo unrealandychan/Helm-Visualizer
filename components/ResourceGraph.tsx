@@ -11,7 +11,7 @@ import {
   type NodeMouseHandler,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useCallback } from "react";
 import { ResourceNode } from "./ResourceNode";
 import type { ResourceGraphNode, ResourceGraphEdge, ResourceNodeData } from "@/types/helm";
 
@@ -58,13 +58,16 @@ export function ResourceGraph({
     setEdges(initialEdges as ResourceGraphEdge[]);
   }, [initialEdges, setEdges]);
 
-  const handleNodeClick: NodeMouseHandler = (_, node) => {
-    onNodeSelect?.((node.data as ResourceNodeData) ?? null);
-  };
+  const handleNodeClick: NodeMouseHandler = useCallback(
+    (_, node) => {
+      onNodeSelect?.((node.data as ResourceNodeData) ?? null);
+    },
+    [onNodeSelect]
+  );
 
-  const handlePaneClick = () => {
+  const handlePaneClick = useCallback(() => {
     onNodeSelect?.(null);
-  };
+  }, [onNodeSelect]);
 
   return (
     <div className="w-full h-full">

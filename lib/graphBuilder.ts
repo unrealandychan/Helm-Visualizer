@@ -43,7 +43,6 @@ interface Edge {
 }
 
 function inferEdges(resources: K8sResource[]): Edge[] {
-  const edges: Edge[] = [];
   const nodeId = (r: K8sResource) => resourceId(r);
 
   // Build lookup maps
@@ -57,6 +56,16 @@ function inferEdges(resources: K8sResource[]): Edge[] {
   const cronJobs = resources.filter((r) => r.kind === "CronJob");
   const configMaps = resources.filter((r) => r.kind === "ConfigMap");
   const secrets = resources.filter((r) => r.kind === "Secret");
+
+  // O(1) name-based lookup maps — avoids O(n) Array.find() inside loops
+  const servicesByName = new Map(services.map((s) => [s.metadata.name, s]));
+  const configMapsByName = new Map(configMaps.map((c) => [c.metadata.name, c]));
+  const secretsByName = new Map(secrets.map((s) => [s.metadata.name, s]));
+  const serviceAccountsByName = new Map(serviceAccounts.map((sa) => [sa.metadata.name, sa]));
+  // For HPA scaleTargetRef we need lookup by "kind/name"
+  const resourcesByKindAndName = new Map(
+    resources.map((r) => [`${r.kind}/${r.metadata.name}`, r])
+  );
 
   // Helper: extract pod spec from any workload kind
   function getPodSpec(r: K8sResource): Record<string, unknown> | undefined {
@@ -74,6 +83,18 @@ function inferEdges(resources: K8sResource[]): Edge[] {
 
   const allWorkloads: K8sResource[] = [...deployments, ...cronJobs];
 
+  // Collect raw edges then deduplicate before returning
+  const edgeSet = new Set<string>();
+  const edges: Edge[] = [];
+
+  function addEdge(source: string, target: string, label: string) {
+    const key = `${source}|${target}|${label}`;
+    if (!edgeSet.has(key)) {
+      edgeSet.add(key);
+      edges.push({ source, target, label });
+    }
+  }
+
   // HPA → Deployment via scaleTargetRef.name
   for (const hpa of hpas) {
     const scaleRef = (hpa.spec as Record<string, unknown> | undefined)?.scaleTargetRef as
@@ -82,14 +103,14 @@ function inferEdges(resources: K8sResource[]): Edge[] {
     if (!scaleRef) continue;
     const targetName = scaleRef.name as string | undefined;
     const targetKind = scaleRef.kind as string | undefined;
+    if (!targetName) continue;
 
-    const target = resources.find(
-      (r) =>
-        r.metadata.name === targetName &&
-        (!targetKind || r.kind === targetKind)
-    );
+    // Prefer exact kind/name lookup; fall back to name-only search among all resources
+    const target = targetKind
+      ? resourcesByKindAndName.get(`${targetKind}/${targetName}`)
+      : resources.find((r) => r.metadata.name === targetName);
     if (target) {
-      edges.push({ source: nodeId(hpa), target: nodeId(target), label: "scales" });
+      addEdge(nodeId(hpa), nodeId(target), "scales");
     }
   }
 
@@ -110,7 +131,7 @@ function inferEdges(resources: K8sResource[]): Edge[] {
         ([k, v]) => podLabels[k] === v
       );
       if (matches) {
-        edges.push({ source: nodeId(svc), target: nodeId(dep), label: "routes to" });
+        addEdge(nodeId(svc), nodeId(dep), "routes to");
       }
     }
   }
@@ -132,9 +153,9 @@ function inferEdges(resources: K8sResource[]): Edge[] {
         const targetName = svcBackend?.name as string | undefined;
         if (!targetName) continue;
 
-        const target = services.find((s) => s.metadata.name === targetName);
+        const target = servicesByName.get(targetName);
         if (target) {
-          edges.push({ source: nodeId(ing), target: nodeId(target), label: "exposes" });
+          addEdge(nodeId(ing), nodeId(target), "exposes");
         }
       }
     }
@@ -146,9 +167,9 @@ function inferEdges(resources: K8sResource[]): Edge[] {
       const podSpec = getPodSpec(workload);
       const saName = podSpec?.serviceAccountName as string | undefined;
       if (!saName) continue;
-      const sa = serviceAccounts.find((s) => s.metadata.name === saName);
+      const sa = serviceAccountsByName.get(saName);
       if (sa) {
-        edges.push({ source: nodeId(sa), target: nodeId(workload), label: "bound to" });
+        addEdge(nodeId(sa), nodeId(workload), "bound to");
       }
     }
   }
@@ -166,14 +187,14 @@ function inferEdges(resources: K8sResource[]): Edge[] {
           const cmRef = ef.configMapRef as Record<string, unknown> | undefined;
           const cmName = cmRef?.name as string | undefined;
           if (cmName) {
-            const cm = configMaps.find((c) => c.metadata.name === cmName);
-            if (cm) edges.push({ source: nodeId(cm), target: nodeId(workload), label: "mounted by" });
+            const cm = configMapsByName.get(cmName);
+            if (cm) addEdge(nodeId(cm), nodeId(workload), "mounted by");
           }
           const secRef = ef.secretRef as Record<string, unknown> | undefined;
           const secName = secRef?.name as string | undefined;
           if (secName) {
-            const sec = secrets.find((s) => s.metadata.name === secName);
-            if (sec) edges.push({ source: nodeId(sec), target: nodeId(workload), label: "mounted by" });
+            const sec = secretsByName.get(secName);
+            if (sec) addEdge(nodeId(sec), nodeId(workload), "mounted by");
           }
         }
       }
@@ -185,14 +206,14 @@ function inferEdges(resources: K8sResource[]): Edge[] {
           const cmVol = vol.configMap as Record<string, unknown> | undefined;
           const cmName = cmVol?.name as string | undefined;
           if (cmName) {
-            const cm = configMaps.find((c) => c.metadata.name === cmName);
-            if (cm) edges.push({ source: nodeId(cm), target: nodeId(workload), label: "mounted by" });
+            const cm = configMapsByName.get(cmName);
+            if (cm) addEdge(nodeId(cm), nodeId(workload), "mounted by");
           }
           const secVol = vol.secret as Record<string, unknown> | undefined;
           const secName = secVol?.secretName as string | undefined;
           if (secName) {
-            const sec = secrets.find((s) => s.metadata.name === secName);
-            if (sec) edges.push({ source: nodeId(sec), target: nodeId(workload), label: "mounted by" });
+            const sec = secretsByName.get(secName);
+            if (sec) addEdge(nodeId(sec), nodeId(workload), "mounted by");
           }
         }
       }
@@ -207,29 +228,27 @@ function inferEdges(resources: K8sResource[]): Edge[] {
       if (!data) continue;
       const referenced = Object.values(data).some((v) => String(v) === svcName);
       if (referenced) {
-        edges.push({ source: nodeId(svc), target: nodeId(cm), label: "referenced by" });
+        addEdge(nodeId(svc), nodeId(cm), "referenced by");
       }
     }
   }
 
-  // Secret → StatefulSet via env.valueFrom.secretKeyRef (e.g., postgres POSTGRES_PASSWORD)
-  for (const sec of secrets) {
-    const secName = sec.metadata.name;
-    for (const workload of allWorkloads) {
-      const podSpec = getPodSpec(workload);
-      if (!podSpec) continue;
-      const containers = podSpec.containers as Array<Record<string, unknown>> | undefined;
-      if (!containers) continue;
-      for (const container of containers) {
-        const env = container.env as Array<Record<string, unknown>> | undefined;
-        if (!env) continue;
-        for (const envVar of env) {
-          const valueFrom = envVar.valueFrom as Record<string, unknown> | undefined;
-          const secretKeyRef = valueFrom?.secretKeyRef as Record<string, unknown> | undefined;
-          if (secretKeyRef?.name === secName) {
-            edges.push({ source: nodeId(sec), target: nodeId(workload), label: "mounted by" });
-          }
-        }
+  // Secret → workloads via env.valueFrom.secretKeyRef
+  for (const workload of allWorkloads) {
+    const podSpec = getPodSpec(workload);
+    if (!podSpec) continue;
+    const containers = podSpec.containers as Array<Record<string, unknown>> | undefined;
+    if (!containers) continue;
+    for (const container of containers) {
+      const env = container.env as Array<Record<string, unknown>> | undefined;
+      if (!env) continue;
+      for (const envVar of env) {
+        const valueFrom = envVar.valueFrom as Record<string, unknown> | undefined;
+        const secretKeyRef = valueFrom?.secretKeyRef as Record<string, unknown> | undefined;
+        const secName = secretKeyRef?.name as string | undefined;
+        if (!secName) continue;
+        const sec = secretsByName.get(secName);
+        if (sec) addEdge(nodeId(sec), nodeId(workload), "mounted by");
       }
     }
   }
