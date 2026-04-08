@@ -46,7 +46,7 @@ export async function runHelmTemplate(
   const cliAvailable = await isHelmAvailable();
 
   if (cliAvailable) {
-    const args: string[] = ["template", releaseName, chartDir];
+    const args: string[] = ["template", releaseName, chartDir, "--kube-version", "1.28.0"];
     for (const vf of valuesFiles) {
       args.push("-f", vf);
     }
