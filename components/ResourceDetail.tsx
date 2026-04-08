@@ -147,17 +147,6 @@ function TabLabel({
   );
 }
 
-function Badge({ label, variant }: { label: string; variant: "blue" | "purple" | "gray" }) {
-  const cls = {
-    blue: "bg-blue-900/60 text-blue-300",
-    purple: "bg-purple-900/60 text-purple-300",
-    gray: "bg-zinc-700 text-zinc-300",
-  }[variant];
-
-  return (
-    <span className={clsx("text-[9px] rounded px-1.5 py-0.5 font-mono", cls)}>{label}</span>
-  );
-}
 
 // ── Simple YAML serialiser ── avoids a full yaml library import on client ──
 function toYaml(obj: unknown, indent = 0): string {
