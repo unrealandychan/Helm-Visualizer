@@ -33,6 +33,22 @@ export function ValuesInspector({ valuesTree, onHighlightKey }: ValuesInspectorP
     return Array.from(keys).sort();
   }, [valuesTree]);
 
+  // Pre-build group → entries map to avoid O(topLevelKeys × entries) per render
+  const groupedEntries = useMemo(() => {
+    if (!valuesTree) return new Map<string, ValuesEntry[]>();
+    const map = new Map<string, ValuesEntry[]>();
+    for (const e of valuesTree.entries) {
+      const group = e.key.split(".")[0];
+      const existing = map.get(group);
+      if (existing) {
+        existing.push(e);
+      } else {
+        map.set(group, [e]);
+      }
+    }
+    return map;
+  }, [valuesTree]);
+
   const filteredEntries = useMemo(() => {
     if (!valuesTree) return [];
     const q = search.toLowerCase();
@@ -101,9 +117,7 @@ export function ValuesInspector({ valuesTree, onHighlightKey }: ValuesInspectorP
           />
         ) : (
           topLevelKeys.map((group) => {
-            const children = valuesTree.entries.filter((e) =>
-              e.key === group || e.key.startsWith(`${group}.`)
-            );
+            const children = groupedEntries.get(group) ?? [];
             const isOpen = expanded.has(group);
             return (
               <GroupRow

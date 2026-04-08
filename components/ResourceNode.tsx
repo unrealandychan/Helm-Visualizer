@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import clsx from "clsx";
 import type { ResourceNodeData, K8sKind } from "@/types/helm";
@@ -28,7 +29,7 @@ type ResourceNodeProps = NodeProps & {
   data: ResourceNodeData;
 };
 
-export function ResourceNode({ data, selected }: ResourceNodeProps) {
+export const ResourceNode = memo(function ResourceNode({ data, selected }: ResourceNodeProps) {
   const cfg = KIND_CONFIG[data.kind] ?? KIND_CONFIG["Unknown"];
 
   return (
@@ -88,7 +89,7 @@ export function ResourceNode({ data, selected }: ResourceNodeProps) {
       />
     </div>
   );
-}
+});
 
 function hasGpu(data: ResourceNodeData): boolean {
   const spec = data.resource.spec as Record<string, unknown> | undefined;
