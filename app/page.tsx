@@ -8,6 +8,7 @@ import { ResourceDetail } from "@/components/ResourceDetail";
 import { EnvSwitcher } from "@/components/EnvSwitcher";
 import { WelcomeScreen } from "@/components/WelcomeScreen";
 import { LayoutGrid, GitBranch, ChevronDown, ChevronUp, Download } from "lucide-react";
+import yaml from "js-yaml";
 import type {
   ChartRenderResult,
   EnvRenderResult,
@@ -137,10 +138,10 @@ export default function Home() {
     if (!chartResult) return;
     const envResult = getEnvResult(chartResult, activeEnv);
     if (!envResult) return;
-    const yaml = envResult.resources
-      .map((r) => "---\n" + JSON.stringify(r, null, 2))
-      .join("\n");
-    const blob = new Blob([yaml], { type: "text/yaml" });
+    const yamlText = envResult.resources
+      .map((r) => "---\n" + yaml.dump(r, { lineWidth: -1 }))
+      .join("");
+    const blob = new Blob([yamlText], { type: "text/yaml" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -273,7 +274,7 @@ export default function Home() {
             onClick={() => setValuesOpen((v) => !v)}
             className="w-full flex items-center gap-2 px-4 py-2 text-xs text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
           >
-            {valuesOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
+            {valuesOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
             <span className="font-semibold">Values Inspector</span>
             {currentEnvResult && (
               <span className="text-zinc-600 ml-1">

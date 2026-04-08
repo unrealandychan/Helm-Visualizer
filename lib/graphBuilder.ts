@@ -154,7 +154,8 @@ function inferEdges(resources: K8sResource[]): Edge[] {
   }
 
   // ConfigMap / Secret → workloads via envFrom and volumes
-  if (configMaps.length > 0 || secrets.length > 0) {    for (const workload of allWorkloads) {
+  if (configMaps.length > 0 || secrets.length > 0) {
+    for (const workload of allWorkloads) {
       const podSpec = getPodSpec(workload);
       if (!podSpec) continue;
 

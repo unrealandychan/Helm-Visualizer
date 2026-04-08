@@ -39,8 +39,10 @@ spec:
             {{- end }}
           env:
             {{- range $k, $v := .Values.app.envVars }}
+            {{- if $v }}
             - name: {{ $k }}
               value: {{ $v | quote }}
+            {{- end }}
             {{- end }}
           livenessProbe:
             httpGet:

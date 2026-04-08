@@ -47,12 +47,16 @@ export function ResourceGraph({
   }, [initialNodes, highlightedKeys]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(annotatedNodes as ResourceGraphNode[]);
-  const [edges, , onEdgesChange] = useEdgesState(initialEdges as ResourceGraphEdge[]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges as ResourceGraphEdge[]);
 
   // Sync when data changes
   useEffect(() => {
     setNodes(annotatedNodes as ResourceGraphNode[]);
   }, [annotatedNodes, setNodes]);
+
+  useEffect(() => {
+    setEdges(initialEdges as ResourceGraphEdge[]);
+  }, [initialEdges, setEdges]);
 
   const handleNodeClick: NodeMouseHandler = (_, node) => {
     onNodeSelect?.((node.data as ResourceNodeData) ?? null);

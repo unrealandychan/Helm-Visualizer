@@ -12,6 +12,33 @@ import { extract } from "tar";
 import { readFile, readdir } from "fs/promises";
 import yaml from "js-yaml";
 
+// Private / loopback address patterns that must never be fetched (SSRF guard).
+const PRIVATE_HOST_RE =
+  /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|::1|fd[0-9a-f]{2}:)/i;
+
+/**
+ * Validate that a URL is safe to fetch:
+ * - Must use https://' or oci://
+ * - Host must not resolve to an internal/private address
+ */
+function assertSafeUrl(raw: string): void {
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    throw new Error("Invalid URL.");
+  }
+
+  if (parsed.protocol !== "https:" && parsed.protocol !== "oci:") {
+    throw new Error("Only https:// and oci:// URLs are allowed.");
+  }
+
+  const host = parsed.hostname.toLowerCase();
+  if (PRIVATE_HOST_RE.test(host)) {
+    throw new Error("Requests to private or loopback addresses are not allowed.");
+  }
+}
+
 export async function POST(request: Request) {
   const tmpDir = path.join("/tmp", `helm-fetch-${randomUUID()}`);
 
@@ -33,15 +60,19 @@ export async function POST(request: Request) {
 
     if (body.url && body.url.includes("artifacthub.io")) {
       // Resolve via Artifact Hub API
+      assertSafeUrl(body.url);
       const resolved = await resolveArtifactHubUrl(body.url);
+      assertSafeUrl(resolved.contentUrl);
       const dest = path.join(tmpDir, "chart.tgz");
       await downloadTgz(resolved.contentUrl, dest);
       tgzPath = dest;
     } else if (body.repoUrl && body.chartName) {
       // Use helm pull directly
+      assertSafeUrl(body.repoUrl);
       tgzPath = await runHelmPull(body.repoUrl, body.chartName, tmpDir, body.version);
     } else if (body.url) {
-      // Treat URL as a direct .tgz download link
+      // Treat URL as a direct .tgz download link — must be https or oci
+      assertSafeUrl(body.url);
       const dest = path.join(tmpDir, "chart.tgz");
       await downloadTgz(body.url, dest);
       tgzPath = dest;
