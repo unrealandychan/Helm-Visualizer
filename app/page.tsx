@@ -7,7 +7,7 @@ import { ValuesInspector } from "@/components/ValuesInspector";
 import { ResourceDetail } from "@/components/ResourceDetail";
 import { EnvSwitcher } from "@/components/EnvSwitcher";
 import { WelcomeScreen } from "@/components/WelcomeScreen";
-import { LayoutGrid, GitBranch, ChevronDown, ChevronUp, Download } from "lucide-react";
+import { LayoutGrid, GitBranch, ChevronDown, ChevronUp, Download, AlertTriangle } from "lucide-react";
 import yaml from "js-yaml";
 import type {
   ChartRenderResult,
@@ -240,18 +240,21 @@ export default function Home() {
           {!chartResult && !showLoader && (
             <WelcomeScreen onLoadChart={() => setShowLoader(true)} />
           )}
-          {currentEnvResult?.renderError && (
-            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 bg-red-950 border border-red-700 text-red-300 text-xs rounded-lg px-4 py-2 max-w-lg">
-              ⚠ Render error: {currentEnvResult.renderError}
-            </div>
-          )}
-          {currentGraph && (
-            <ResourceGraph
-              nodes={diffNodes.length > 0 ? diffNodes : currentGraph.nodes}
-              edges={currentGraph.edges}
-              highlightedKeys={highlightedKeys}
-              onNodeSelect={setSelectedResource}
+          {currentEnvResult?.renderError ? (
+            <RenderErrorPanel
+              error={currentEnvResult.renderError}
+              env={currentEnvResult.env}
+              onLoadChart={() => setShowLoader(true)}
             />
+          ) : (
+            currentGraph && (
+              <ResourceGraph
+                nodes={diffNodes.length > 0 ? diffNodes : currentGraph.nodes}
+                edges={currentGraph.edges}
+                highlightedKeys={highlightedKeys}
+                onNodeSelect={setSelectedResource}
+              />
+            )
           )}
         </div>
 
@@ -307,6 +310,43 @@ function useDiffNodes(
     const changed = !other || JSON.stringify(node.data.resource) !== JSON.stringify(other.data.resource);
     return changed ? { ...node, data: { ...node.data, highlighted: true } } : node;
   });
+}
+
+function RenderErrorPanel({
+  error,
+  env,
+  onLoadChart,
+}: {
+  error: string;
+  env: string;
+  onLoadChart: () => void;
+}) {
+  return (
+    <div className="flex flex-col items-center justify-center h-full px-8 py-12 gap-5">
+      <div className="w-14 h-14 rounded-2xl bg-red-950/60 border border-red-700/50 flex items-center justify-center shrink-0">
+        <AlertTriangle className="w-7 h-7 text-red-400" />
+      </div>
+      <div className="text-center max-w-lg">
+        <h2 className="text-white font-semibold text-base mb-1">
+          Render failed for <span className="text-red-400">{env}</span>
+        </h2>
+        <p className="text-zinc-400 text-xs mb-4">
+          <code className="bg-zinc-800 px-1 py-0.5 rounded">helm template</code> returned an error.
+          Check your templates and values file for issues.
+        </p>
+        <pre className="text-left text-red-300 text-[11px] bg-red-950/40 border border-red-800/60 rounded-lg p-4 overflow-x-auto overflow-y-auto max-h-52 whitespace-pre-wrap font-mono leading-relaxed">
+          {error}
+        </pre>
+      </div>
+      <button
+        onClick={onLoadChart}
+        className="flex items-center gap-2 text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-4 py-2 rounded-lg transition-colors"
+      >
+        <LayoutGrid className="w-3.5 h-3.5" />
+        Load a different chart
+      </button>
+    </div>
+  );
 }
 
 function GraphPlaceholder({ text }: { text: string }) {
