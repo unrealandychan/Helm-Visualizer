@@ -1,6 +1,5 @@
 "use client";
 
-import clsx from "clsx";
 import type { EnvRenderResult } from "@/types/helm";
 import { GitCompare } from "lucide-react";
 
@@ -27,6 +26,18 @@ function envColor(env: string): string {
   return ENV_COLORS[env.toLowerCase()] ?? ENV_COLORS.default;
 }
 
+function envTabClass(env: string, activeEnv: string, hasError: boolean): string {
+  const base = "px-3 py-1 rounded text-xs font-semibold transition-all";
+  if (hasError) {
+    return activeEnv === env
+      ? `${base} bg-red-900 text-red-300 ring-1 ring-red-600`
+      : `${base} bg-zinc-800 text-red-400 hover:text-red-300`;
+  }
+  return activeEnv === env
+    ? `${base} ${envColor(env)}`
+    : `${base} bg-zinc-800 text-zinc-400 hover:text-zinc-200`;
+}
+
 export function EnvSwitcher({
   environments,
   activeEnv,
@@ -44,13 +55,7 @@ export function EnvSwitcher({
           <button
             key={env.env}
             onClick={() => onEnvChange(env.env)}
-            className={clsx(
-              "px-3 py-1 rounded text-xs font-semibold transition-all",
-              activeEnv === env.env
-                ? envColor(env.env)
-                : "bg-zinc-800 text-zinc-400 hover:text-zinc-200",
-              env.renderError && "opacity-60"
-            )}
+            className={envTabClass(env.env, activeEnv, !!env.renderError)}
             title={env.renderError ? `Render error: ${env.renderError}` : undefined}
           >
             {env.env}

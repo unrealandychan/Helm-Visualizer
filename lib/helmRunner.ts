@@ -52,10 +52,21 @@ export async function runHelmTemplate(
     }
     args.push(...extraArgs);
 
-    const { stdout, stderr } = await execFileAsync(helmBin(), args, {
-      timeout: HELM_TIMEOUT_MS,
-      maxBuffer: 20 * 1024 * 1024,
-    });
+    let stdout: string;
+    let stderr: string;
+    try {
+      ({ stdout, stderr } = await execFileAsync(helmBin(), args, {
+        timeout: HELM_TIMEOUT_MS,
+        maxBuffer: 20 * 1024 * 1024,
+      }));
+    } catch (err) {
+      const helmErr = err as { stderr?: string; message?: string; code?: number | string };
+      const errStderr = helmErr.stderr?.trim();
+      if (errStderr) {
+        throw new Error(`helm template failed:\n${errStderr}`);
+      }
+      throw err;
+    }
 
     if (stderr && stderr.trim()) {
       console.warn("[helmRunner] helm template stderr:", stderr.trim());

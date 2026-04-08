@@ -349,7 +349,15 @@ export function ChartLoader({ onLoad, history = [] }: ChartLoaderProps) {
       {error && (
         <div className="mt-4 flex items-start gap-2 bg-red-950/50 border border-red-800 rounded-lg p-3">
           <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
-          <p className="text-red-300 text-xs">{error}</p>
+          <div className="min-w-0 flex-1">
+            {error.includes("\n") ? (
+              <pre className="text-red-300 text-xs font-mono whitespace-pre-wrap overflow-x-auto max-h-40 overflow-y-auto">
+                {error}
+              </pre>
+            ) : (
+              <p className="text-red-300 text-xs">{error}</p>
+            )}
+          </div>
         </div>
       )}
 
