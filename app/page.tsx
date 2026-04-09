@@ -7,6 +7,7 @@ import { ValuesInspector } from "@/components/ValuesInspector";
 import { ResourceDetail } from "@/components/ResourceDetail";
 import { EnvSwitcher } from "@/components/EnvSwitcher";
 import { WelcomeScreen } from "@/components/WelcomeScreen";
+import { ChatBot } from "@/components/ChatBot";
 import { LayoutGrid, GitBranch, ChevronDown, ChevronUp, Download, AlertTriangle } from "lucide-react";
 import yaml from "js-yaml";
 import type {
@@ -270,6 +271,8 @@ export default function Home() {
           </div>
         )}
       </div>
+
+      <ChatBot chartContext={chartResult} activeEnv={activeEnv} />
 
       {chartResult && (
         <div
