@@ -26,6 +26,7 @@ Paste an Artifact Hub URL, upload a `.tgz` chart, or load the chart from your ow
 | **Kind badges** | Header shows a live count of each resource kind in the active environment |
 | **Resource relationships** | Edges show how resources connect: `routes to`, `exposes`, `bound to`, `mounted by`, `referenced by` |
 | **Pure-JS renderer** | Go templates processed entirely in-browser when Helm CLI unavailable — no server-side helm binary |
+| **AI Chat Assistant** | Floating chatbot panel — ask natural-language questions about the loaded chart's resources, values, and configuration |
 
 ---
 
@@ -37,6 +38,8 @@ npm run dev
 ```
 
 Open http://localhost:3000. The workspace chart (`helm/`) is loaded automatically.
+
+To enable the AI Chat Assistant, copy `env.example` to `.env.local`, set your `OPENAI_API_KEY`, then restart the dev server (see [LLM Chat Assistant](#llm-chat-assistant) for details).
 
 ---
 
@@ -66,17 +69,53 @@ The visualizer discovers all `values.<env>.yaml` files next to `values.yaml` and
 
 ---
 
+## LLM Chat Assistant
+
+A floating chat panel (bottom-right corner) lets you ask questions about the currently loaded chart in plain English:
+
+- "How many replicas does the Deployment use in production?"
+- "Which resources reference the `image.tag` value?"
+- "What Kubernetes version features does this chart rely on?"
+- "Suggest improvements to the HPA configuration."
+
+The assistant is aware of the chart's metadata, every rendered Kubernetes resource, and all values keys for the active environment.
+
+### Setup
+
+1. Copy `env.example` to `.env.local`:
+   ```bash
+   cp env.example .env.local
+   ```
+2. Set your API key:
+   ```
+   OPENAI_API_KEY=sk-...
+   ```
+3. Restart the dev server — the chat button appears in the bottom-right corner of the UI.
+
+### Configuration
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `OPENAI_API_KEY` | **Yes** | — | API key for OpenAI or any compatible provider |
+| `OPENAI_BASE_URL` | No | `https://api.openai.com` | Override to use Azure OpenAI, Groq, Ollama, etc. |
+| `OPENAI_MODEL` | No | `gpt-4o-mini` | Model name passed to the chat completions endpoint |
+
+Any OpenAI-compatible API is supported — simply set `OPENAI_BASE_URL` to your provider's endpoint.
+
+---
+
 ## Project Structure
 
 ```
 helm-chart-visualizer/
 ├── app/
-│   ├── page.tsx              # Main page — header, graph, values panel
+│   ├── page.tsx              # Main page — header, graph, values panel, chatbot
 │   └── api/
 │       ├── workspace-chart/  # Reads helm/ from the repo
 │       ├── upload-chart/     # Accepts multipart .tgz upload
 │       ├── fetch-chart/      # Downloads and renders from URL / OCI
-│       └── search-charts/    # Proxies Artifact Hub search API
+│       ├── search-charts/    # Proxies Artifact Hub search API
+│       └── chat/             # LLM chat completions (streaming SSE)
 ├── components/
 │   ├── ChartLoader.tsx       # Tab-based chart input modal
 │   ├── ResourceGraph.tsx     # React Flow canvas
@@ -84,13 +123,15 @@ helm-chart-visualizer/
 │   ├── ResourceDetail.tsx    # YAML sidebar for selected node
 │   ├── ValuesInspector.tsx   # Values tree panel
 │   ├── EnvSwitcher.tsx       # Environment & diff selector
-│   └── WelcomeScreen.tsx     # Landing screen with feature highlights
+│   ├── WelcomeScreen.tsx     # Landing screen with feature highlights
+│   └── ChatBot.tsx           # Floating LLM chat panel
 ├── lib/
 │   ├── helmTemplateRenderer.ts  # Pure-JS Go template engine
 │   ├── graphBuilder.ts          # Builds React Flow nodes/edges from resources
 │   └── valuesBuilder.ts         # Extracts & annotates the values tree
 ├── types/
 │   └── helm.ts               # Shared TypeScript types
+├── env.example               # Template for .env.local (LLM config)
 └── helm/                     # Sample workspace chart (multi-env webapp)
     ├── Chart.yaml
     ├── values.yaml
@@ -142,6 +183,7 @@ Supported features:
 | Layout | @dagrejs/dagre |
 | YAML | js-yaml |
 | Icons | lucide-react |
+| LLM | OpenAI-compatible chat completions API (streaming SSE) |
 
 ---
 
