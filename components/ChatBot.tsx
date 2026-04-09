@@ -28,7 +28,7 @@ export function ChatBot({ chartContext, activeEnv }: ChatBotProps) {
 
   // Scroll to bottom whenever messages change or streaming updates
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    bottomRef.current?.scrollIntoView({ behavior: streaming ? "auto" : "smooth" });
   }, [messages, streaming]);
 
   // Focus input when panel opens
@@ -37,6 +37,13 @@ export function ChatBot({ chartContext, activeEnv }: ChatBotProps) {
       setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [open]);
+
+  // Abort any in-flight request on unmount
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
 
   const sendMessage = useCallback(async () => {
     const text = input.trim();
@@ -56,6 +63,24 @@ export function ChatBot({ chartContext, activeEnv }: ChatBotProps) {
     const controller = new AbortController();
     abortRef.current = controller;
 
+    // Build a minimal context — strip large fields (spec, labels, annotations, raw values)
+    // to keep request payload small and avoid hitting server/LLM limits.
+    const minimalContext = chartContext
+      ? {
+          chartMeta: chartContext.chartMeta,
+          environments: chartContext.environments.map((env) => ({
+            env: env.env,
+            renderError: env.renderError,
+            resources: env.resources.map((r) => ({
+              apiVersion: r.apiVersion,
+              kind: r.kind,
+              metadata: { name: r.metadata?.name, namespace: r.metadata?.namespace },
+            })),
+            valuesTree: { entries: env.valuesTree.entries.slice(0, 200) },
+          })),
+        }
+      : null;
+
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
@@ -65,7 +90,7 @@ export function ChatBot({ chartContext, activeEnv }: ChatBotProps) {
             role: m.role,
             content: m.content,
           })),
-          chartContext,
+          chartContext: minimalContext,
           activeEnv,
         }),
         signal: controller.signal,
@@ -88,10 +113,11 @@ export function ChatBot({ chartContext, activeEnv }: ChatBotProps) {
 
       const decoder = new TextDecoder();
       let buffer = "";
+      let done = false;
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+      while (!done) {
+        const { done: readDone, value } = await reader.read();
+        if (readDone) break;
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");
         buffer = lines.pop() ?? "";
@@ -99,7 +125,10 @@ export function ChatBot({ chartContext, activeEnv }: ChatBotProps) {
         for (const line of lines) {
           if (!line.startsWith("data: ")) continue;
           const data = line.slice(6).trim();
-          if (data === "[DONE]") break;
+          if (data === "[DONE]") {
+            done = true;
+            break;
+          }
           try {
             const parsed = JSON.parse(data);
             const delta: string = parsed.choices?.[0]?.delta?.content ?? "";
@@ -168,7 +197,7 @@ export function ChatBot({ chartContext, activeEnv }: ChatBotProps) {
 
       {/* Chat panel */}
       {open && (
-        <div className="fixed bottom-22 right-6 z-40 w-[360px] max-h-[520px] flex flex-col rounded-2xl shadow-2xl border border-zinc-700 bg-zinc-900 overflow-hidden">
+        <div className="fixed bottom-[88px] right-6 z-40 w-[360px] max-h-[520px] flex flex-col rounded-2xl shadow-2xl border border-zinc-700 bg-zinc-900 overflow-hidden">
           {/* Header */}
           <div className="flex items-center gap-2 px-4 py-3 bg-zinc-800 border-b border-zinc-700 shrink-0">
             <Bot className="w-4 h-4 text-blue-400 shrink-0" />
