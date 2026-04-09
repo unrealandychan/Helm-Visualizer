@@ -43,6 +43,10 @@ interface ChatRequest {
   activeEnv: string;
 }
 
+// Maximum number of resources / values entries to include in the LLM system prompt.
+// The client-side ChatBot.tsx also applies this cap before sending to reduce payload size.
+const PROMPT_ENTRY_LIMIT = 200;
+
 function buildSystemPrompt(chartContext: MinimalChartContext | null, activeEnv: string): string {
   if (!chartContext) {
     return [
@@ -76,9 +80,8 @@ function buildSystemPrompt(chartContext: MinimalChartContext | null, activeEnv: 
     if (envResult.renderError) {
       lines.push("", "## Render error", envResult.renderError);
     } else {
-      const resourceLimit = 200;
-      const displayedResources = envResult.resources.slice(0, resourceLimit);
-      const omittedResources = envResult.resources.slice(resourceLimit);
+      const displayedResources = envResult.resources.slice(0, PROMPT_ENTRY_LIMIT);
+      const omittedResources = envResult.resources.slice(PROMPT_ENTRY_LIMIT);
       const omittedResourceSummary: string[] =
         omittedResources.length > 0
           ? (() => {
@@ -108,8 +111,8 @@ function buildSystemPrompt(chartContext: MinimalChartContext | null, activeEnv: 
         ...omittedResourceSummary,
         "",
         "## Values (dot-notation keys)",
-        // Cap at 200 entries to stay within the LLM context window
-        ...envResult.valuesTree.entries.slice(0, 200).map(
+        // Cap at PROMPT_ENTRY_LIMIT entries to stay within the LLM context window
+        ...envResult.valuesTree.entries.slice(0, PROMPT_ENTRY_LIMIT).map(
           (e) => `- ${e.key}: ${JSON.stringify(e.value)} (${e.type})`
         ),
       );

@@ -65,6 +65,8 @@ export function ChatBot({ chartContext, activeEnv }: ChatBotProps) {
 
     // Build a minimal context — strip large fields (spec, labels, annotations, raw values)
     // to keep request payload small and avoid hitting server/LLM limits.
+    // The entry cap here must match PROMPT_ENTRY_LIMIT in app/api/chat/route.ts.
+    const PAYLOAD_ENTRY_LIMIT = 200;
     const minimalContext = chartContext
       ? {
           chartMeta: chartContext.chartMeta,
@@ -76,7 +78,7 @@ export function ChatBot({ chartContext, activeEnv }: ChatBotProps) {
               kind: r.kind,
               metadata: { name: r.metadata?.name, namespace: r.metadata?.namespace },
             })),
-            valuesTree: { entries: env.valuesTree.entries.slice(0, 200) },
+            valuesTree: { entries: env.valuesTree.entries.slice(0, PAYLOAD_ENTRY_LIMIT) },
           })),
         }
       : null;
