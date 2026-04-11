@@ -25,6 +25,30 @@ function assertValidChartDir(chartDir: string): void {
 }
 
 /**
+ * Validate that a chart name contains only safe characters to prevent argument injection.
+ * Throws if invalid.
+ */
+function assertValidChartName(chartName: string): void {
+  if (!/^[a-zA-Z0-9_-]+$/.test(chartName)) {
+    throw new Error(
+      `Invalid chart name "${chartName}". Chart names must only contain letters, digits, hyphens, and underscores.`
+    );
+  }
+}
+
+/**
+ * Validate that a chart version string contains only safe characters.
+ * Throws if invalid.
+ */
+function assertValidChartVersion(version: string): void {
+  if (!/^[a-zA-Z0-9._+:-]+$/.test(version)) {
+    throw new Error(
+      `Invalid version "${version}". Versions must only contain letters, digits, dots, hyphens, underscores, plus signs, and colons.`
+    );
+  }
+}
+
+/**
  * Run `helm template` on a chart directory with optional values file overrides.
  * Automatically falls back to the pure-JS renderer if `helm` is not installed.
  *
@@ -106,6 +130,11 @@ export async function runHelmPull(
   destDir: string,
   version?: string
 ): Promise<string> {
+  assertValidChartName(chartName);
+  if (version !== undefined) {
+    assertValidChartVersion(version);
+  }
+
   const args: string[] = [
     "pull",
     "--repo",

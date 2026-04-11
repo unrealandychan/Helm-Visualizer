@@ -69,6 +69,18 @@ export async function POST(request: Request) {
     } else if (body.repoUrl && body.chartName) {
       // Use helm pull directly
       assertSafeUrl(body.repoUrl);
+      if (!/^[a-zA-Z0-9_-]+$/.test(body.chartName)) {
+        return NextResponse.json(
+          { error: "Invalid chart name. Chart names must only contain letters, digits, hyphens, and underscores." },
+          { status: 400 }
+        );
+      }
+      if (body.version !== undefined && !/^[a-zA-Z0-9._+:-]+$/.test(body.version)) {
+        return NextResponse.json(
+          { error: "Invalid version format. Versions must only contain letters, digits, dots, hyphens, underscores, plus signs, and colons." },
+          { status: 400 }
+        );
+      }
       tgzPath = await runHelmPull(body.repoUrl, body.chartName, tmpDir, body.version);
     } else if (body.url) {
       // Treat URL as a direct .tgz download link — must be https or oci
