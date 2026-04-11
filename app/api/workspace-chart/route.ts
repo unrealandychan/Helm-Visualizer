@@ -7,6 +7,7 @@ import { runHelmTemplate } from "@/lib/helmRunner";
 import { parseMultiDocYaml, extractValuesEntries } from "@/lib/yamlParser";
 import { buildGraph } from "@/lib/graphBuilder";
 import yaml from "js-yaml";
+import { extractEnvName } from "@/lib/chartRenderer";
 
 // The workspace's own helm chart lives here relative to process.cwd()
 const CHART_DIR = path.join(process.cwd(), "helm");
@@ -106,9 +107,3 @@ export async function GET(request: Request) {
   }
 }
 
-function extractEnvName(valuesFilePath: string): string {
-  const base = path.basename(valuesFilePath, ".yaml");
-  // e.g. "values.dev" → "dev", "values" → "default"
-  const parts = base.split(".");
-  return parts.length > 1 ? parts[parts.length - 1] : "default";
-}
