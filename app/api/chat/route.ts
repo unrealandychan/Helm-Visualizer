@@ -47,6 +47,10 @@ interface ChatRequest {
 // The client-side ChatBot.tsx also applies this cap before sending to reduce payload size.
 const PROMPT_ENTRY_LIMIT = 200;
 
+// Server-side limits to prevent oversized or abusive requests.
+const MAX_MESSAGES = 50;
+const MAX_MESSAGE_CHARS = 4000;
+
 function buildSystemPrompt(chartContext: MinimalChartContext | null, activeEnv: string): string {
   if (!chartContext) {
     return [
@@ -156,6 +160,21 @@ export async function POST(request: Request) {
   const { messages, chartContext, activeEnv } = body;
   if (!Array.isArray(messages) || messages.length === 0) {
     return NextResponse.json({ error: "messages array is required." }, { status: 400 });
+  }
+  if (messages.length > MAX_MESSAGES) {
+    return NextResponse.json(
+      { error: `Too many messages. Maximum allowed is ${MAX_MESSAGES}.` },
+      { status: 400 }
+    );
+  }
+  const oversizedMessage = messages.find(
+    (m) => typeof m.content === "string" && m.content.length > MAX_MESSAGE_CHARS
+  );
+  if (oversizedMessage) {
+    return NextResponse.json(
+      { error: `Message content exceeds the maximum allowed length of ${MAX_MESSAGE_CHARS} characters.` },
+      { status: 400 }
+    );
   }
 
   // Normalize base URL: strip trailing slash, then ensure exactly one /v1 path segment.
