@@ -1,6 +1,10 @@
 import { execFile } from "child_process";
 import { promisify } from "util";
 import { existsSync } from "fs";
+import { readFile, mkdtemp, rm, readdir } from "fs/promises";
+import path from "path";
+import { tmpdir } from "os";
+import { extract } from "tar";
 import { renderHelmChartJS } from "./helmTemplateRenderer";
 
 const execFileAsync = promisify(execFile);
@@ -80,15 +84,75 @@ export async function runHelmTemplate(
 }
 
 /**
+ * Pure-JS fallback for `runHelmShowValues`.
+ * Reads `values.yaml` directly from a chart directory or a `.tgz` archive.
+ */
+async function readHelmShowValuesJS(chartPath: string): Promise<string> {
+  if (!chartPath.endsWith(".tgz")) {
+    // Directory: read values.yaml directly
+    const valuesPath = path.join(chartPath, "values.yaml");
+    if (existsSync(valuesPath)) {
+      return readFile(valuesPath, "utf-8");
+    }
+    return "";
+  }
+
+  // .tgz archive: extract only values.yaml into a temp dir
+  const tmpDir = await mkdtemp(path.join(tmpdir(), "helm-values-"));
+  try {
+    await extract({
+      file: chartPath,
+      cwd: tmpDir,
+      strip: 1,
+      filter: (p: string) =>
+        path.basename(p) === "values.yaml" && !p.includes("/charts/"),
+    });
+    const valuesPath = path.join(tmpDir, "values.yaml");
+    if (existsSync(valuesPath)) {
+      return readFile(valuesPath, "utf-8");
+    }
+    return "";
+  } finally {
+    rm(tmpDir, { recursive: true, force: true }).catch((e) => {
+      console.warn("[helmRunner] failed to remove temp dir:", e);
+    });
+  }
+}
+
+/**
  * Run `helm show values` on a chart directory or .tgz file.
  * Returns the YAML string of the default values.
+ * Automatically falls back to reading values.yaml directly if `helm` is not installed.
  */
 export async function runHelmShowValues(chartPath: string): Promise<string> {
-  const { stdout } = await execFileAsync(helmBin(), ["show", "values", chartPath], {
-    timeout: HELM_TIMEOUT_MS,
-    maxBuffer: 5 * 1024 * 1024,
-  });
-  return stdout;
+  const cliAvailable = await isHelmAvailable();
+
+  if (cliAvailable) {
+    let stdout: string;
+    let stderr: string;
+    try {
+      ({ stdout, stderr } = await execFileAsync(helmBin(), ["show", "values", chartPath], {
+        timeout: HELM_TIMEOUT_MS,
+        maxBuffer: 5 * 1024 * 1024,
+      }));
+    } catch (err) {
+      const helmErr = err as { stderr?: string; message?: string; code?: number | string };
+      const errStderr = helmErr.stderr?.trim();
+      if (errStderr) {
+        throw new Error(`helm show values failed:\n${errStderr}`);
+      }
+      throw err;
+    }
+
+    if (stderr && stderr.trim()) {
+      console.warn("[helmRunner] helm show values stderr:", stderr.trim());
+    }
+    return stdout;
+  }
+
+  // JS fallback
+  console.info("[helmRunner] helm CLI not found — reading values.yaml directly");
+  return readHelmShowValuesJS(chartPath);
 }
 
 /**
@@ -129,8 +193,8 @@ export async function runHelmPull(
   }
 
   // Find the downloaded file
-  const { readdir } = await import("fs/promises");
   const files = await readdir(destDir);
+
   const tgz = files.find((f) => f.endsWith(".tgz"));
   if (!tgz) {
     throw new Error(`helm pull did not produce a .tgz in ${destDir}`);
