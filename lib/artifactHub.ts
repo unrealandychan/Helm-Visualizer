@@ -1,16 +1,7 @@
 import type { ArtifactHubPackage, ArtifactHubSearchResult } from "@/types/helm";
+import { assertSafeHostname } from "@/lib/ssrf";
 
 const ARTIFACT_HUB_API = "https://artifacthub.io/api/v1";
-
-// Private / loopback address patterns — SSRF guard.
-const PRIVATE_HOST_RE =
-  /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|::1|fd[0-9a-f]{2}:)/i;
-
-function assertSafeHost(hostname: string): void {
-  if (PRIVATE_HOST_RE.test(hostname.toLowerCase())) {
-    throw new Error(`Registry hostname "${hostname}" resolves to a private address.`);
-  }
-}
 
 /**
  * Search Artifact Hub for Helm charts matching a query string.
@@ -155,7 +146,7 @@ async function downloadOciChart(ociUrl: string, destPath: string): Promise<void>
   const repository = ref.slice(slashIdx + 1);        // e.g. bitnamicharts/nginx
 
   // SSRF guard — reject private/loopback registry hostnames
-  assertSafeHost(registry);
+  await assertSafeHostname(registry);
 
   // ── 1. Authenticate ──────────────────────────────────────────────────────
   const token = await getOciToken(registry, repository);
