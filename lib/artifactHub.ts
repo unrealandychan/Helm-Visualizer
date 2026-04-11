@@ -266,6 +266,13 @@ async function getOciToken(registry: string, repository: string): Promise<string
   if (!realm) return null;
 
   const authUrl = new URL(realm);
+
+  // SSRF guard — the realm URL must use HTTPS and must not point to a private address.
+  if (authUrl.protocol !== "https:") {
+    throw new Error("OCI auth realm must use HTTPS.");
+  }
+  assertSafeHost(authUrl.hostname);
+
   if (service) authUrl.searchParams.set("service", service);
   authUrl.searchParams.set("scope", `repository:${repository}:pull`);
 
