@@ -1,12 +1,17 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { Upload, Globe, FolderOpen, Search, ChevronRight, AlertCircle, Clock, Zap } from "lucide-react";
+import { Upload, Globe, FolderOpen, Search, ChevronRight, AlertCircle, Clock, Zap, GitCompare } from "lucide-react";
 import clsx from "clsx";
+import yaml from "js-yaml";
 import type { ChartRenderResult, ArtifactHubPackage } from "@/types/helm";
 import type { HistoryEntry } from "@/app/page";
+import { extractValuesEntries } from "@/lib/yamlParser";
+import { computeValuesDiff } from "@/lib/valueDiff";
+import { EnvDiffPanel } from "@/components/EnvDiffPanel";
+import type { ValuesDiffResult } from "@/types/helm";
 
-type Tab = "workspace" | "upload" | "artifacthub" | "history";
+type Tab = "workspace" | "upload" | "artifacthub" | "history" | "compare";
 
 const POPULAR_CHARTS = [
   { name: "nginx",      repo: "bitnami",      desc: "NGINX web server"            },
@@ -38,6 +43,18 @@ export function ChartLoader({ onLoad, history = [] }: ChartLoaderProps) {
   const [ahSearch, setAhSearch] = useState("");
   const [ahResults, setAhResults] = useState<ArtifactHubPackage[]>([]);
   const [ahSearching, setAhSearching] = useState(false);
+
+  // Compare tab state
+  const [compareFileA, setCompareFileA] = useState<{ name: string; content: string } | null>(null);
+  const [compareFileB, setCompareFileB] = useState<{ name: string; content: string } | null>(null);
+  const [compareError, setCompareError] = useState<string | null>(null);
+  const [compareDiff, setCompareDiff] = useState<ValuesDiffResult | null>(null);
+  const [compareLabelA, setCompareLabelA] = useState("");
+  const [compareLabelB, setCompareLabelB] = useState("");
+  const [compareDragOverA, setCompareDragOverA] = useState(false);
+  const [compareDragOverB, setCompareDragOverB] = useState(false);
+  const compareFileRefA = useRef<HTMLInputElement>(null);
+  const compareFileRefB = useRef<HTMLInputElement>(null);
 
   async function loadWorkspaceChart() {
     await fetchWithLoading(() => fetch("/api/workspace-chart"), "workspace");
@@ -132,11 +149,62 @@ export function ChartLoader({ onLoad, history = [] }: ChartLoaderProps) {
     }
   }
 
+  function readYamlFile(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target?.result as string ?? "");
+      reader.onerror = () => reject(new Error("Failed to read file"));
+      reader.readAsText(file);
+    });
+  }
+
+  async function handleCompareFileA(file: File) {
+    setCompareError(null);
+    setCompareDiff(null);
+    try {
+      const content = await readYamlFile(file);
+      yaml.load(content); // validate YAML (js-yaml v4 is safe by default)
+      setCompareFileA({ name: file.name, content });
+      setCompareLabelA(file.name.replace(/\.(yaml|yml)$/, ""));
+    } catch {
+      setCompareError(`File A is not valid YAML: ${file.name}`);
+    }
+  }
+
+  async function handleCompareFileB(file: File) {
+    setCompareError(null);
+    setCompareDiff(null);
+    try {
+      const content = await readYamlFile(file);
+      yaml.load(content); // validate YAML (js-yaml v4 is safe by default)
+      setCompareFileB({ name: file.name, content });
+      setCompareLabelB(file.name.replace(/\.(yaml|yml)$/, ""));
+    } catch {
+      setCompareError(`File B is not valid YAML: ${file.name}`);
+    }
+  }
+
+  function runCompare() {
+    if (!compareFileA || !compareFileB) return;
+    setCompareError(null);
+    try {
+      const labelA = compareLabelA.trim() || compareFileA.name;
+      const labelB = compareLabelB.trim() || compareFileB.name;
+      const treeA = extractValuesEntries(compareFileA.content, labelA);
+      const treeB = extractValuesEntries(compareFileB.content, labelB);
+      setCompareDiff(computeValuesDiff(treeA, treeB));
+      setCompareLabelA(labelA);
+      setCompareLabelB(labelB);
+    } catch (e) {
+      setCompareError(e instanceof Error ? e.message : "Failed to compare files");
+    }
+  }
+
   return (
     <div className="bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl w-full max-w-2xl mx-auto p-5">
       {/* Tabs */}
       <div className="flex gap-1 mb-5 bg-zinc-800 rounded-lg p-1">
-        {(["history", "workspace", "upload", "artifacthub"] as Tab[]).map((tab) => (
+        {(["history", "workspace", "upload", "artifacthub", "compare"] as Tab[]).map((tab) => (
           <button
             key={tab}
             onClick={() => { setActiveTab(tab); setError(null); }}
@@ -151,9 +219,11 @@ export function ChartLoader({ onLoad, history = [] }: ChartLoaderProps) {
             {tab === "workspace"   && <FolderOpen className="w-3 h-3" />}
             {tab === "upload"      && <Upload className="w-3 h-3" />}
             {tab === "artifacthub" && <Globe className="w-3 h-3" />}
+            {tab === "compare"     && <GitCompare className="w-3 h-3" />}
             {tab === "history"     ? "Recent" :
              tab === "workspace"   ? "Workspace" :
-             tab === "upload"      ? "Upload" : "Artifact Hub"}
+             tab === "upload"      ? "Upload" :
+             tab === "compare"     ? "Compare" : "Artifact Hub"}
             {tab === "history" && history.length > 0 && (
               <span className="bg-blue-600 text-white text-[9px] rounded-full px-1 leading-none py-0.5">
                 {history.length}
@@ -343,6 +413,155 @@ export function ChartLoader({ onLoad, history = [] }: ChartLoaderProps) {
             </div>
           )}
         </div>
+      )}
+
+      {activeTab === "compare" && (
+        <div className="space-y-4">
+          <p className="text-xs text-zinc-400">
+            Upload two YAML values files to compare them side-by-side.
+          </p>
+
+          {/* Two file upload zones */}
+          <div className="grid grid-cols-2 gap-3">
+            {/* File A */}
+            <div>
+              <label className="text-xs text-zinc-400 mb-1 block">Base (e.g. dev.yaml)</label>
+              <div
+                className={clsx(
+                  "border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors",
+                  compareDragOverA
+                    ? "border-emerald-500 bg-emerald-950/40"
+                    : compareFileA
+                      ? "border-emerald-600 bg-emerald-950/20"
+                      : "border-zinc-600 hover:border-zinc-500"
+                )}
+                onClick={() => compareFileRefA.current?.click()}
+                onDragOver={(e) => { e.preventDefault(); setCompareDragOverA(true); }}
+                onDragLeave={() => setCompareDragOverA(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setCompareDragOverA(false);
+                  const file = e.dataTransfer.files[0];
+                  if (file) handleCompareFileA(file);
+                }}
+              >
+                {compareFileA ? (
+                  <div>
+                    <p className="text-emerald-300 text-xs font-medium truncate">{compareFileA.name}</p>
+                    <p className="text-zinc-500 text-[10px] mt-0.5">click to change</p>
+                  </div>
+                ) : (
+                  <div>
+                    <Upload className="w-5 h-5 text-zinc-500 mx-auto mb-1" />
+                    <p className="text-zinc-400 text-xs">Drop or click</p>
+                  </div>
+                )}
+              </div>
+              <input
+                ref={compareFileRefA}
+                type="file"
+                accept=".yaml,.yml"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleCompareFileA(file);
+                  e.target.value = "";
+                }}
+              />
+              {compareFileA && (
+                <input
+                  type="text"
+                  value={compareLabelA}
+                  onChange={(e) => setCompareLabelA(e.target.value)}
+                  placeholder="Label (e.g. dev)"
+                  className="mt-1 w-full bg-zinc-800 border border-zinc-600 rounded text-xs text-white px-2 py-1 outline-none focus:border-blue-500 placeholder-zinc-500"
+                />
+              )}
+            </div>
+
+            {/* File B */}
+            <div>
+              <label className="text-xs text-zinc-400 mb-1 block">Compare (e.g. prod.yaml)</label>
+              <div
+                className={clsx(
+                  "border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors",
+                  compareDragOverB
+                    ? "border-blue-500 bg-blue-950/40"
+                    : compareFileB
+                      ? "border-blue-600 bg-blue-950/20"
+                      : "border-zinc-600 hover:border-zinc-500"
+                )}
+                onClick={() => compareFileRefB.current?.click()}
+                onDragOver={(e) => { e.preventDefault(); setCompareDragOverB(true); }}
+                onDragLeave={() => setCompareDragOverB(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setCompareDragOverB(false);
+                  const file = e.dataTransfer.files[0];
+                  if (file) handleCompareFileB(file);
+                }}
+              >
+                {compareFileB ? (
+                  <div>
+                    <p className="text-blue-300 text-xs font-medium truncate">{compareFileB.name}</p>
+                    <p className="text-zinc-500 text-[10px] mt-0.5">click to change</p>
+                  </div>
+                ) : (
+                  <div>
+                    <Upload className="w-5 h-5 text-zinc-500 mx-auto mb-1" />
+                    <p className="text-zinc-400 text-xs">Drop or click</p>
+                  </div>
+                )}
+              </div>
+              <input
+                ref={compareFileRefB}
+                type="file"
+                accept=".yaml,.yml"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleCompareFileB(file);
+                  e.target.value = "";
+                }}
+              />
+              {compareFileB && (
+                <input
+                  type="text"
+                  value={compareLabelB}
+                  onChange={(e) => setCompareLabelB(e.target.value)}
+                  placeholder="Label (e.g. prod)"
+                  className="mt-1 w-full bg-zinc-800 border border-zinc-600 rounded text-xs text-white px-2 py-1 outline-none focus:border-blue-500 placeholder-zinc-500"
+                />
+              )}
+            </div>
+          </div>
+
+          <button
+            onClick={runCompare}
+            disabled={!compareFileA || !compareFileB}
+            className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm px-4 py-2 rounded-lg font-medium transition-colors"
+          >
+            <GitCompare className="w-4 h-4" />
+            Compare Values
+          </button>
+
+          {compareError && (
+            <div className="flex items-start gap-2 bg-red-950/50 border border-red-800 rounded-lg p-3">
+              <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+              <p className="text-red-300 text-xs">{compareError}</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Compare diff panel (opens over modal) */}
+      {compareDiff && compareFileA && compareFileB && (
+        <EnvDiffPanel
+          diffResult={compareDiff}
+          baseEnv={compareLabelA || compareFileA.name}
+          compareEnv={compareLabelB || compareFileB.name}
+          onClose={() => setCompareDiff(null)}
+        />
       )}
 
       {/* Error */}

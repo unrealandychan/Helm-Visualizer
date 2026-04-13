@@ -104,6 +104,37 @@ export interface GraphData {
 }
 
 // ──────────────────────────────────────────────
+// Values diff types
+// ──────────────────────────────────────────────
+
+export type DiffStatus = "added" | "removed" | "changed" | "unchanged";
+
+export interface ValuesDiffEntry {
+  key: string;
+  status: DiffStatus;
+  baseValue?: unknown;
+  compareValue?: unknown;
+  baseType?: ValuesEntry["type"];
+  compareType?: ValuesEntry["type"];
+}
+
+export interface ValuesDiffSummary {
+  total: number;
+  added: number;
+  removed: number;
+  changed: number;
+  /** Removed keys + keys whose type changed */
+  breaking: number;
+}
+
+export interface ValuesDiffResult {
+  entries: ValuesDiffEntry[];
+  summary: ValuesDiffSummary;
+  /** All keys that differ (for graph node highlighting) */
+  changedKeys: string[];
+}
+
+// ──────────────────────────────────────────────
 // Artifact Hub API types
 // ──────────────────────────────────────────────
 

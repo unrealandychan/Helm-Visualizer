@@ -7,6 +7,7 @@ import { ValuesInspector } from "@/components/ValuesInspector";
 import { ResourceDetail } from "@/components/ResourceDetail";
 import { ManifestPreview } from "@/components/ManifestPreview";
 import { EnvSwitcher } from "@/components/EnvSwitcher";
+import { EnvDiffPanel } from "@/components/EnvDiffPanel";
 import { WelcomeScreen } from "@/components/WelcomeScreen";
 import { ChatBot } from "@/components/ChatBot";
 import { LayoutGrid, GitBranch, ChevronDown, ChevronUp, Download, AlertTriangle, Layers } from "lucide-react";
@@ -19,6 +20,7 @@ import type {
   K8sKind,
 } from "@/types/helm";
 import type { GraphData } from "@/types/helm";
+import { computeValuesDiff } from "@/lib/valueDiff";
 
 const HISTORY_KEY = "helm-viz-history";
 const MAX_HISTORY = 8;
@@ -101,6 +103,7 @@ export default function Home() {
   const [showLoader, setShowLoader] = useState(true);
   const [valuesOpen, setValuesOpen] = useState(true);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [showDiffPanel, setShowDiffPanel] = useState(false);
   const [showManifest, setShowManifest] = useState(false);
   const [selectedValueKey, setSelectedValueKey] = useState<string | null>(null);
 
@@ -157,9 +160,16 @@ export default function Home() {
   const currentGraph = getEnvGraph(chartResult, activeEnv);
   const currentEnvResult = getEnvResult(chartResult, activeEnv);
   const diffGraph = getEnvGraph(chartResult, diffEnv ?? "");
+  const diffEnvResult = getEnvResult(chartResult, diffEnv ?? "");
+
+  const diffResult = useMemo(() => {
+    if (!currentEnvResult || !diffEnvResult) return null;
+    return computeValuesDiff(currentEnvResult.valuesTree, diffEnvResult.valuesTree);
+  }, [currentEnvResult, diffEnvResult]);
+
   const diffNodes = useMemo(
-    () => computeDiffNodes(currentGraph?.nodes ?? [], diffGraph?.nodes ?? []),
-    [currentGraph?.nodes, diffGraph?.nodes]
+    () => computeDiffNodes(currentGraph?.nodes ?? [], diffGraph?.nodes ?? [], diffResult?.changedKeys ?? []),
+    [currentGraph?.nodes, diffGraph?.nodes, diffResult?.changedKeys]
   );
   const kindCounts = getKindCounts(chartResult, activeEnv);
 
@@ -252,7 +262,17 @@ export default function Home() {
           activeEnv={activeEnv}
           diffEnv={diffEnv}
           onEnvChange={(env) => { setActiveEnv(env); setSelectedResource(null); }}
-          onDiffEnvChange={setDiffEnv}
+          onDiffEnvChange={(env) => { setDiffEnv(env); setShowDiffPanel(false); }}
+          onViewDiff={diffResult ? () => setShowDiffPanel(true) : undefined}
+        />
+      )}
+
+      {showDiffPanel && diffResult && diffEnv && (
+        <EnvDiffPanel
+          diffResult={diffResult}
+          baseEnv={activeEnv}
+          compareEnv={diffEnv}
+          onClose={() => setShowDiffPanel(false)}
         />
       )}
 
@@ -339,13 +359,19 @@ export default function Home() {
 
 function computeDiffNodes(
   baseNodes: ResourceGraphNode[],
-  compareNodes: ResourceGraphNode[]
+  compareNodes: ResourceGraphNode[],
+  changedValueKeys: string[] = []
 ): ResourceGraphNode[] {
-  if (compareNodes.length === 0) return [];
+  if (compareNodes.length === 0 && changedValueKeys.length === 0) return [];
   const compareMap = new Map(compareNodes.map((n) => [n.id, n]));
+  const changedKeySet = new Set(changedValueKeys);
   return baseNodes.map((node) => {
     const other = compareMap.get(node.id);
-    const changed = !other || JSON.stringify(node.data.resource) !== JSON.stringify(other.data.resource);
+    // Highlight if resource structure differs or any of its used values keys changed
+    const resourceChanged = compareNodes.length > 0 &&
+      (!other || JSON.stringify(node.data.resource) !== JSON.stringify(other.data.resource));
+    const valuesChanged = node.data.valuesUsed.some((k) => changedKeySet.has(k));
+    const changed = resourceChanged || valuesChanged;
     return changed ? { ...node, data: { ...node.data, highlighted: true } } : node;
   });
 }
