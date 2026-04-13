@@ -172,7 +172,7 @@ export function exportDiffAsJson(
           status: e.status,
           ...(e.baseValue !== undefined ? { from: e.baseValue } : {}),
           ...(e.compareValue !== undefined ? { to: e.compareValue } : {}),
-          ...(e.baseType !== e.compareType
+          ...(e.status === "changed" && e.baseType !== e.compareType
             ? { typeChange: `${e.baseType} → ${e.compareType}` }
             : {}),
         })),
