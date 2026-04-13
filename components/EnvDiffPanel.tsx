@@ -215,7 +215,9 @@ export function EnvDiffPanel({
                     : "text-zinc-500 hover:text-zinc-300"
                 )}
               >
-                {f === "all" ? `All (${summary.total})` : f}
+                {f === "all"
+                  ? `All (${showUnchanged ? diffResult.entries.length : summary.total})`
+                  : f}
               </button>
             ))}
           </div>
