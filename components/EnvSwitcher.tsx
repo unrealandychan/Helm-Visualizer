@@ -1,7 +1,7 @@
 "use client";
 
 import type { EnvRenderResult } from "@/types/helm";
-import { GitCompare } from "lucide-react";
+import { GitCompare, BarChart2 } from "lucide-react";
 
 interface EnvSwitcherProps {
   environments: EnvRenderResult[];
@@ -9,6 +9,7 @@ interface EnvSwitcherProps {
   diffEnv: string | null;
   onEnvChange: (env: string) => void;
   onDiffEnvChange: (env: string | null) => void;
+  onViewDiff?: () => void;
 }
 
 // Environments with well-known colors
@@ -44,6 +45,7 @@ export function EnvSwitcher({
   diffEnv,
   onEnvChange,
   onDiffEnvChange,
+  onViewDiff,
 }: EnvSwitcherProps) {
   const activeResult = environments.find((e) => e.env === activeEnv);
 
@@ -90,6 +92,16 @@ export function EnvSwitcher({
                 </option>
               ))}
           </select>
+          {diffEnv && onViewDiff && (
+            <button
+              onClick={onViewDiff}
+              className="flex items-center gap-1.5 text-xs bg-amber-700 hover:bg-amber-600 text-white px-3 py-1 rounded transition-colors font-medium"
+              title={`View detailed diff: ${activeEnv} vs ${diffEnv}`}
+            >
+              <BarChart2 className="w-3.5 h-3.5" />
+              View Diff
+            </button>
+          )}
         </div>
       )}
     </div>
