@@ -62,6 +62,7 @@ export async function renderChart(chartDir: string): Promise<NextResponse> {
           env,
           valuesFile: vf ? path.basename(vf) : "values.yaml",
           resources,
+          renderedManifest: rendered,
           valuesTree,
           graph,
         } as EnvRenderResult & { graph: ReturnType<typeof buildGraph> };
