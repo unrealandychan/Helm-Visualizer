@@ -1,8 +1,12 @@
 # Helm Chart Visualizer
 
+[![GitHub Repo](https://img.shields.io/badge/GitHub-unrealandychan%2FHelm--Visualizer-blue?logo=github)](https://github.com/unrealandychan/Helm-Visualizer)
+
 An interactive, browser-based Helm chart renderer and Kubernetes resource graph — uses Helm CLI when available, falls back to pure-JS renderer, no cluster access required.
 
 Paste an Artifact Hub URL, upload a `.tgz` chart, or load the chart from your own workspace. Switch environments, diff configs, and explore every rendered resource.
+
+> **Source:** [https://github.com/unrealandychan/Helm-Visualizer](https://github.com/unrealandychan/Helm-Visualizer)
 
 ![Alt text](helm-viz.png)
 
@@ -202,6 +206,16 @@ npm start
 
 ---
 
+## Contributing
+
+Contributions are welcome! Please open an issue or submit a pull request on [GitHub](https://github.com/unrealandychan/Helm-Visualizer).
+
+---
+
 ## License
 
 Apache 2.0 — see [LICENSE](LICENSE).
+
+---
+
+**GitHub:** [https://github.com/unrealandychan/Helm-Visualizer](https://github.com/unrealandychan/Helm-Visualizer)
