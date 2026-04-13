@@ -74,6 +74,7 @@ export async function GET(request: Request) {
             env: envName,
             valuesFile: path.basename(vf),
             resources,
+            renderedManifest: rendered,
             valuesTree,
             graph,
           } as EnvRenderResult & { graph: ReturnType<typeof buildGraph> };

@@ -5,10 +5,11 @@ import { ChartLoader } from "@/components/ChartLoader";
 import dynamic from "next/dynamic";
 import { ValuesInspector } from "@/components/ValuesInspector";
 import { ResourceDetail } from "@/components/ResourceDetail";
+import { ManifestPreview } from "@/components/ManifestPreview";
 import { EnvSwitcher } from "@/components/EnvSwitcher";
 import { WelcomeScreen } from "@/components/WelcomeScreen";
 import { ChatBot } from "@/components/ChatBot";
-import { LayoutGrid, GitBranch, ChevronDown, ChevronUp, Download, AlertTriangle } from "lucide-react";
+import { LayoutGrid, GitBranch, ChevronDown, ChevronUp, Download, AlertTriangle, Layers } from "lucide-react";
 import yaml from "js-yaml";
 import type {
   ChartRenderResult,
@@ -100,6 +101,8 @@ export default function Home() {
   const [showLoader, setShowLoader] = useState(true);
   const [valuesOpen, setValuesOpen] = useState(true);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [showManifest, setShowManifest] = useState(false);
+  const [selectedValueKey, setSelectedValueKey] = useState<string | null>(null);
 
   useEffect(() => {
     setHistory(loadHistory());
@@ -194,14 +197,28 @@ export default function Home() {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {chartResult && (
-            <button
-              onClick={exportYaml}
-              className="flex items-center gap-1.5 text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-3 py-1.5 rounded-lg transition-colors"
-              title={`Export ${activeEnv} YAML`}
-            >
-              <Download className="w-3.5 h-3.5" />
-              Export
-            </button>
+            <>
+              <button
+                onClick={exportYaml}
+                className="flex items-center gap-1.5 text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-3 py-1.5 rounded-lg transition-colors"
+                title={`Export ${activeEnv} YAML`}
+              >
+                <Download className="w-3.5 h-3.5" />
+                Export
+              </button>
+              <button
+                onClick={() => setShowManifest((v) => !v)}
+                className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-colors ${
+                  showManifest
+                    ? "bg-blue-700 text-white"
+                    : "bg-zinc-800 hover:bg-zinc-700 text-zinc-300"
+                }`}
+                title="Toggle rendered manifest preview"
+              >
+                <Layers className="w-3.5 h-3.5" />
+                Manifest
+              </button>
+            </>
           )}
           <button
             onClick={() => setShowLoader((v) => !v)}
@@ -270,6 +287,18 @@ export default function Home() {
             />
           </div>
         )}
+
+        {showManifest && !selectedResource && (
+          <div className="w-[420px] shrink-0 overflow-hidden flex flex-col">
+            <ManifestPreview
+              renderedManifest={currentEnvResult?.renderedManifest ?? null}
+              renderError={currentEnvResult?.renderError}
+              selectedValueKey={selectedValueKey}
+              isWorkspace={!!chartResult?.environments.some((e) => e.valuesFile?.startsWith("values"))}
+              onClose={() => setShowManifest(false)}
+            />
+          </div>
+        )}
       </div>
 
       <ChatBot chartContext={chartResult} activeEnv={activeEnv} />
@@ -295,7 +324,10 @@ export default function Home() {
             <div className="overflow-hidden" style={{ height: 204 }}>
               <ValuesInspector
                 valuesTree={currentEnvResult?.valuesTree ?? null}
-                onHighlightKey={setHighlightedKeys}
+                onHighlightKey={(keys) => {
+                  setHighlightedKeys(keys);
+                  setSelectedValueKey(keys.length > 0 ? keys[0] : null);
+                }}
               />
             </div>
           )}
