@@ -51,6 +51,8 @@ export function ChartLoader({ onLoad, history = [] }: ChartLoaderProps) {
   const [compareDiff, setCompareDiff] = useState<ValuesDiffResult | null>(null);
   const [compareLabelA, setCompareLabelA] = useState("");
   const [compareLabelB, setCompareLabelB] = useState("");
+  const [compareDragOverA, setCompareDragOverA] = useState(false);
+  const [compareDragOverB, setCompareDragOverB] = useState(false);
   const compareFileRefA = useRef<HTMLInputElement>(null);
   const compareFileRefB = useRef<HTMLInputElement>(null);
 
@@ -427,11 +429,21 @@ export function ChartLoader({ onLoad, history = [] }: ChartLoaderProps) {
               <div
                 className={clsx(
                   "border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors",
-                  compareFileA
-                    ? "border-emerald-600 bg-emerald-950/20"
-                    : "border-zinc-600 hover:border-zinc-500"
+                  compareDragOverA
+                    ? "border-emerald-500 bg-emerald-950/40"
+                    : compareFileA
+                      ? "border-emerald-600 bg-emerald-950/20"
+                      : "border-zinc-600 hover:border-zinc-500"
                 )}
                 onClick={() => compareFileRefA.current?.click()}
+                onDragOver={(e) => { e.preventDefault(); setCompareDragOverA(true); }}
+                onDragLeave={() => setCompareDragOverA(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setCompareDragOverA(false);
+                  const file = e.dataTransfer.files[0];
+                  if (file) handleCompareFileA(file);
+                }}
               >
                 {compareFileA ? (
                   <div>
@@ -473,11 +485,21 @@ export function ChartLoader({ onLoad, history = [] }: ChartLoaderProps) {
               <div
                 className={clsx(
                   "border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors",
-                  compareFileB
-                    ? "border-blue-600 bg-blue-950/20"
-                    : "border-zinc-600 hover:border-zinc-500"
+                  compareDragOverB
+                    ? "border-blue-500 bg-blue-950/40"
+                    : compareFileB
+                      ? "border-blue-600 bg-blue-950/20"
+                      : "border-zinc-600 hover:border-zinc-500"
                 )}
                 onClick={() => compareFileRefB.current?.click()}
+                onDragOver={(e) => { e.preventDefault(); setCompareDragOverB(true); }}
+                onDragLeave={() => setCompareDragOverB(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setCompareDragOverB(false);
+                  const file = e.dataTransfer.files[0];
+                  if (file) handleCompareFileB(file);
+                }}
               >
                 {compareFileB ? (
                   <div>
