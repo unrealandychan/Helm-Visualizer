@@ -51,6 +51,7 @@ export interface EnvRenderResult {
   valuesFile: string;
   resources: K8sResource[];
   valuesTree: ValuesTree;
+  renderedManifest?: string;
   renderError?: string;
 }
 
