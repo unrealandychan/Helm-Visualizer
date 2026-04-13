@@ -55,7 +55,9 @@ export function computeValuesDiff(
         key,
         status: "unchanged",
         baseValue: baseEntry.value,
+        compareValue: compareEntry.value,
         baseType: baseEntry.type,
+        compareType: compareEntry.type,
       });
     }
   }
