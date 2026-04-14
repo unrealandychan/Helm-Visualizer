@@ -45,6 +45,77 @@ const nodeTypes = {
 
 const IMAGE_WIDTH = 1920;
 const IMAGE_HEIGHT = 1080;
+const VIEWPORT_SELECTOR = ".react-flow__viewport";
+
+// ──────────────────────────────────────────────
+// ExportController — rendered INSIDE <ReactFlow> so it has access to the RF context
+// ──────────────────────────────────────────────
+
+interface ExportControllerProps {
+  containerRef: React.RefObject<HTMLDivElement | null>;
+  exportFilename: string;
+}
+
+const ExportController = forwardRef<ResourceGraphHandle, ExportControllerProps>(
+  ({ containerRef, exportFilename }, ref) => {
+    const { getNodes } = useReactFlow();
+
+    function getExportViewport() {
+      const allNodes = getNodes();
+      const bounds = getNodesBounds(allNodes);
+      return getViewportForBounds(bounds, IMAGE_WIDTH, IMAGE_HEIGHT, 0.05, 2, 0.1);
+    }
+
+    useImperativeHandle(ref, () => ({
+      async exportPng() {
+        const el = containerRef.current?.querySelector<HTMLElement>(VIEWPORT_SELECTOR);
+        if (!el) return;
+        const { x, y, zoom } = getExportViewport();
+        const dataUrl = await toPng(el, {
+          backgroundColor: "#09090b",
+          width: IMAGE_WIDTH,
+          height: IMAGE_HEIGHT,
+          style: {
+            width: `${IMAGE_WIDTH}px`,
+            height: `${IMAGE_HEIGHT}px`,
+            transform: `translate(${x}px, ${y}px) scale(${zoom})`,
+          },
+        });
+        const a = document.createElement("a");
+        a.href = dataUrl;
+        a.download = `${exportFilename}.png`;
+        a.click();
+      },
+
+      async exportSvg() {
+        const el = containerRef.current?.querySelector<HTMLElement>(VIEWPORT_SELECTOR);
+        if (!el) return;
+        const { x, y, zoom } = getExportViewport();
+        const dataUrl = await toSvg(el, {
+          backgroundColor: "#09090b",
+          width: IMAGE_WIDTH,
+          height: IMAGE_HEIGHT,
+          style: {
+            width: `${IMAGE_WIDTH}px`,
+            height: `${IMAGE_HEIGHT}px`,
+            transform: `translate(${x}px, ${y}px) scale(${zoom})`,
+          },
+        });
+        const a = document.createElement("a");
+        a.href = dataUrl;
+        a.download = `${exportFilename}.svg`;
+        a.click();
+      },
+    }));
+
+    return null;
+  }
+);
+ExportController.displayName = "ExportController";
+
+// ──────────────────────────────────────────────
+// ResourceGraph — the public component
+// ──────────────────────────────────────────────
 
 function ResourceGraphInner(
   {
@@ -56,7 +127,6 @@ function ResourceGraphInner(
   }: ResourceGraphProps,
   ref: React.Ref<ResourceGraphHandle>
 ) {
-  const { getNodes } = useReactFlow();
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Apply highlight state to nodes
@@ -96,56 +166,6 @@ function ResourceGraphInner(
     onNodeSelect?.(null);
   }, [onNodeSelect]);
 
-  function getExportViewport() {
-    const allNodes = getNodes();
-    const bounds = getNodesBounds(allNodes);
-    return getViewportForBounds(bounds, IMAGE_WIDTH, IMAGE_HEIGHT, 0.05, 2, 0.1);
-  }
-
-  const VIEWPORT_SELECTOR = ".react-flow__viewport";
-
-  useImperativeHandle(ref, () => ({
-    async exportPng() {
-      const el = containerRef.current?.querySelector<HTMLElement>(VIEWPORT_SELECTOR);
-      if (!el) return;
-      const { x, y, zoom } = getExportViewport();
-      const dataUrl = await toPng(el, {
-        backgroundColor: "#09090b",
-        width: IMAGE_WIDTH,
-        height: IMAGE_HEIGHT,
-        style: {
-          width: `${IMAGE_WIDTH}px`,
-          height: `${IMAGE_HEIGHT}px`,
-          transform: `translate(${x}px, ${y}px) scale(${zoom})`,
-        },
-      });
-      const a = document.createElement("a");
-      a.href = dataUrl;
-      a.download = `${exportFilename}.png`;
-      a.click();
-    },
-
-    async exportSvg() {
-      const el = containerRef.current?.querySelector<HTMLElement>(VIEWPORT_SELECTOR);
-      if (!el) return;
-      const { x, y, zoom } = getExportViewport();
-      const dataUrl = await toSvg(el, {
-        backgroundColor: "#09090b",
-        width: IMAGE_WIDTH,
-        height: IMAGE_HEIGHT,
-        style: {
-          width: `${IMAGE_WIDTH}px`,
-          height: `${IMAGE_HEIGHT}px`,
-          transform: `translate(${x}px, ${y}px) scale(${zoom})`,
-        },
-      });
-      const a = document.createElement("a");
-      a.href = dataUrl;
-      a.download = `${exportFilename}.svg`;
-      a.click();
-    },
-  }));
-
   return (
     <div className="w-full h-full" ref={containerRef}>
       <ReactFlow
@@ -167,6 +187,8 @@ function ResourceGraphInner(
           labelBgStyle: { fill: "transparent" },
         }}
       >
+        {/* ExportController is a child of ReactFlow so it can use useReactFlow() */}
+        <ExportController ref={ref} containerRef={containerRef} exportFilename={exportFilename} />
         <Background
           variant={BackgroundVariant.Dots}
           gap={20}
