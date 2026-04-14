@@ -102,9 +102,11 @@ function ResourceGraphInner(
     return getViewportForBounds(bounds, IMAGE_WIDTH, IMAGE_HEIGHT, 0.05, 2, 0.1);
   }
 
+  const VIEWPORT_SELECTOR = ".react-flow__viewport";
+
   useImperativeHandle(ref, () => ({
     async exportPng() {
-      const el = containerRef.current?.querySelector<HTMLElement>(".react-flow__viewport");
+      const el = containerRef.current?.querySelector<HTMLElement>(VIEWPORT_SELECTOR);
       if (!el) return;
       const { x, y, zoom } = getExportViewport();
       const dataUrl = await toPng(el, {
@@ -124,7 +126,7 @@ function ResourceGraphInner(
     },
 
     async exportSvg() {
-      const el = containerRef.current?.querySelector<HTMLElement>(".react-flow__viewport");
+      const el = containerRef.current?.querySelector<HTMLElement>(VIEWPORT_SELECTOR);
       if (!el) return;
       const { x, y, zoom } = getExportViewport();
       const dataUrl = await toSvg(el, {
@@ -183,6 +185,7 @@ function ResourceGraphInner(
 }
 
 export const ResourceGraph = forwardRef<ResourceGraphHandle, ResourceGraphProps>(ResourceGraphInner);
+ResourceGraph.displayName = "ResourceGraph";
 
 function kindToMiniMapColor(kind: string): string {
   const map: Record<string, string> = {

@@ -180,8 +180,6 @@ export default function Home() {
     setExportingType(type);
     setShowExportMenu(false);
     try {
-      const visibleNodes = diffNodes.length > 0 ? diffNodes : (currentGraph?.nodes ?? []);
-      const visibleEdges = currentGraph?.edges ?? [];
       const basename = `${chartResult.chartMeta.name}-${activeEnv}-graph`;
 
       if (type === "png") {
@@ -221,6 +219,13 @@ export default function Home() {
     [currentGraph?.nodes, diffGraph?.nodes, diffResult?.changedKeys]
   );
   const kindCounts = getKindCounts(chartResult, activeEnv);
+
+  // The set of nodes/edges actually shown in the graph (respects diff overlay)
+  const visibleNodes = useMemo(
+    () => diffNodes.length > 0 ? diffNodes : (currentGraph?.nodes ?? []),
+    [diffNodes, currentGraph?.nodes]
+  );
+  const visibleEdges = currentGraph?.edges ?? [];
 
   return (
     <div className="flex flex-col h-screen bg-zinc-950 text-white overflow-hidden">
@@ -398,8 +403,8 @@ export default function Home() {
             currentGraph && (
               <ResourceGraph
                 ref={graphRef}
-                nodes={diffNodes.length > 0 ? diffNodes : currentGraph.nodes}
-                edges={currentGraph.edges}
+                nodes={visibleNodes}
+                edges={visibleEdges}
                 highlightedKeys={highlightedKeys}
                 onNodeSelect={setSelectedResource}
                 exportFilename={chartResult ? `${chartResult.chartMeta.name}-${activeEnv}-graph` : "helm-graph"}

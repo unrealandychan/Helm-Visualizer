@@ -142,7 +142,7 @@ export function triggerDownload(
   a.href = url;
   a.download = filename;
   a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 0);
+  setTimeout(() => URL.revokeObjectURL(url), 100);
 }
 
 export function triggerBlobDownload(blob: Blob, filename: string): void {
@@ -151,5 +151,5 @@ export function triggerBlobDownload(blob: Blob, filename: string): void {
   a.href = url;
   a.download = filename;
   a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 0);
+  setTimeout(() => URL.revokeObjectURL(url), 100);
 }
