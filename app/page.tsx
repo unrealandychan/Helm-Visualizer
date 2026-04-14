@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { ChartLoader } from "@/components/ChartLoader";
 import dynamic from "next/dynamic";
 import { ValuesInspector } from "@/components/ValuesInspector";
@@ -10,7 +10,7 @@ import { EnvSwitcher } from "@/components/EnvSwitcher";
 import { EnvDiffPanel } from "@/components/EnvDiffPanel";
 import { WelcomeScreen } from "@/components/WelcomeScreen";
 import { ChatBot } from "@/components/ChatBot";
-import { LayoutGrid, GitBranch, ChevronDown, ChevronUp, Download, AlertTriangle, Layers } from "lucide-react";
+import { LayoutGrid, GitBranch, ChevronDown, ChevronUp, Download, AlertTriangle, Layers, FileImage, FileJson, FileText, Image as ImageIcon } from "lucide-react";
 import yaml from "js-yaml";
 import type {
   ChartRenderResult,
@@ -21,6 +21,8 @@ import type {
 } from "@/types/helm";
 import type { GraphData } from "@/types/helm";
 import { computeValuesDiff } from "@/lib/valueDiff";
+import { exportGraphAsJson, exportGraphAsMarkdown, triggerDownload } from "@/lib/graphExport";
+import type { ResourceGraphHandle } from "@/components/ResourceGraph";
 
 const HISTORY_KEY = "helm-viz-history";
 const MAX_HISTORY = 8;
@@ -106,6 +108,22 @@ export default function Home() {
   const [showDiffPanel, setShowDiffPanel] = useState(false);
   const [showManifest, setShowManifest] = useState(false);
   const [selectedValueKey, setSelectedValueKey] = useState<string | null>(null);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [exportingType, setExportingType] = useState<string | null>(null);
+  const graphRef = useRef<ResourceGraphHandle>(null);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close export menu when clicking outside
+  useEffect(() => {
+    if (!showExportMenu) return;
+    function handleClick(e: MouseEvent) {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setShowExportMenu(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [showExportMenu]);
 
   useEffect(() => {
     setHistory(loadHistory());
@@ -155,6 +173,37 @@ export default function Home() {
     a.download = `${chartResult.chartMeta.name}-${activeEnv}.yaml`;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  async function handleGraphExport(type: "png" | "svg" | "json" | "markdown") {
+    if (!chartResult) return;
+    setExportingType(type);
+    setShowExportMenu(false);
+    try {
+      const visibleNodes = diffNodes.length > 0 ? diffNodes : (currentGraph?.nodes ?? []);
+      const visibleEdges = currentGraph?.edges ?? [];
+      const basename = `${chartResult.chartMeta.name}-${activeEnv}-graph`;
+
+      if (type === "png") {
+        await graphRef.current?.exportPng();
+      } else if (type === "svg") {
+        await graphRef.current?.exportSvg();
+      } else if (type === "json") {
+        const content = exportGraphAsJson(visibleNodes, visibleEdges, chartResult.chartMeta, activeEnv);
+        triggerDownload(content, `${basename}.json`, "application/json");
+      } else if (type === "markdown") {
+        const content = exportGraphAsMarkdown(
+          visibleNodes,
+          visibleEdges,
+          chartResult.chartMeta,
+          activeEnv,
+          highlightedKeys
+        );
+        triggerDownload(content, `${basename}.md`, "text/markdown");
+      }
+    } finally {
+      setExportingType(null);
+    }
   }
 
   const currentGraph = getEnvGraph(chartResult, activeEnv);
@@ -214,8 +263,54 @@ export default function Home() {
                 title={`Export ${activeEnv} YAML`}
               >
                 <Download className="w-3.5 h-3.5" />
-                Export
+                Export YAML
               </button>
+              {/* Graph export dropdown */}
+              <div className="relative" ref={exportMenuRef}>
+                <button
+                  onClick={() => setShowExportMenu((v) => !v)}
+                  className="flex items-center gap-1.5 text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-3 py-1.5 rounded-lg transition-colors"
+                  title="Export graph view"
+                  disabled={!!exportingType}
+                >
+                  <FileImage className="w-3.5 h-3.5" />
+                  {exportingType ? "Exporting…" : "Export Graph"}
+                  <ChevronDown className="w-3 h-3 ml-0.5" />
+                </button>
+                {showExportMenu && (
+                  <div className="absolute right-0 top-full mt-1 w-44 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl z-50 overflow-hidden">
+                    <button
+                      onClick={() => handleGraphExport("png")}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-700 transition-colors"
+                    >
+                      <ImageIcon className="w-3.5 h-3.5 text-blue-400" />
+                      PNG image
+                    </button>
+                    <button
+                      onClick={() => handleGraphExport("svg")}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-700 transition-colors"
+                    >
+                      <FileImage className="w-3.5 h-3.5 text-green-400" />
+                      SVG image
+                    </button>
+                    <div className="border-t border-zinc-700" />
+                    <button
+                      onClick={() => handleGraphExport("json")}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-700 transition-colors"
+                    >
+                      <FileJson className="w-3.5 h-3.5 text-yellow-400" />
+                      JSON data
+                    </button>
+                    <button
+                      onClick={() => handleGraphExport("markdown")}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-700 transition-colors"
+                    >
+                      <FileText className="w-3.5 h-3.5 text-purple-400" />
+                      Markdown
+                    </button>
+                  </div>
+                )}
+              </div>
               <button
                 onClick={() => setShowManifest((v) => !v)}
                 className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-colors ${
@@ -302,10 +397,12 @@ export default function Home() {
           ) : (
             currentGraph && (
               <ResourceGraph
+                ref={graphRef}
                 nodes={diffNodes.length > 0 ? diffNodes : currentGraph.nodes}
                 edges={currentGraph.edges}
                 highlightedKeys={highlightedKeys}
                 onNodeSelect={setSelectedResource}
+                exportFilename={chartResult ? `${chartResult.chartMeta.name}-${activeEnv}-graph` : "helm-graph"}
               />
             )
           )}
