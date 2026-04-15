@@ -15,42 +15,74 @@ interface ChartYamlShape {
 /**
  * Matches a YAML mapping key line: optional leading whitespace followed by
  * a key (no colons, brackets, braces, block indicators, quotes, anchors, or
- * leading whitespace), then a colon and whitespace delimiter.
+ * leading whitespace), then a colon delimiter (with optional trailing
+ * whitespace or end-of-line for bare "parent:" keys).
  * Groups: (1) leading indent, (2) key text.
  */
-const YAML_KEY_RE = /^(\s*)([^:#\[\]{},|>'"&*\s][^:#\[\]{},]*?):\s/;
+const YAML_KEY_RE = /^(\s*)([^:#\[\]{},|>'"&*\s][^:#\[\]{},]*?):(?:\s|$)/;
 
 /**
- * Scan raw YAML text for duplicate mapping keys at the same indentation scope.
- * Returns every duplicate occurrence with a 1-based line number.
+ * Scan raw YAML text for duplicate mapping keys within the same scope.
  *
- * Limitations: detects duplicate keys at the same literal indentation depth.
- * Works for the most common case of flat / singly-nested values files.
+ * Uses an indentation stack so that identical key names in *different* nested
+ * scopes (e.g. `resources.limits.cpu` vs `resources.requests.cpu`) are NOT
+ * flagged as duplicates. List-item markers ("- ") reset the child scope so
+ * that identical keys across separate list entries are also not flagged.
+ *
+ * Returns every duplicate occurrence with a 1-based line number.
  */
 export function findDuplicateKeys(content: string): Array<{ key: string; line: number }> {
   const duplicates: Array<{ key: string; line: number }> = [];
-  // Map of "indentWidth::keyName" → first-seen line (1-based)
-  const seen = new Map<string, number>();
+
+  /**
+   * Stack of mapping scopes. Each frame holds the indent depth of the
+   * mapping's keys and the keys already seen in that scope.
+   */
+  const stack: Array<{ indent: number; seen: Map<string, number> }> = [
+    { indent: -1, seen: new Map() }, // synthetic root frame
+  ];
 
   const lines = content.split("\n");
   for (let i = 0; i < lines.length; i++) {
     const raw = lines[i];
     const trimmed = raw.trimStart();
 
-    // Skip blank lines, comments, and list items
-    if (!trimmed || trimmed.startsWith("#") || trimmed.startsWith("- ")) continue;
+    // Skip blank lines and comments
+    if (!trimmed || trimmed.startsWith("#")) continue;
+
+    const indent = raw.length - trimmed.length;
+
+    // A list-item marker ("- ") starts a fresh mapping scope for its children.
+    // Pop any child frames from previous list entries so their keys don't
+    // pollute the next entry's scope.
+    if (trimmed.startsWith("- ") || trimmed === "-") {
+      while (stack.length > 1 && stack[stack.length - 1].indent > indent) {
+        stack.pop();
+      }
+      continue;
+    }
 
     const match = raw.match(YAML_KEY_RE);
     if (!match) continue;
 
-    const indentWidth = match[1].length;
     const key = match[2].trim();
-    const scopeKey = `${indentWidth}::${key}`;
 
-    if (seen.has(scopeKey)) {
-      duplicates.push({ key, line: i + 1 });
+    // Return to the appropriate parent scope when indentation decreases.
+    while (stack.length > 1 && stack[stack.length - 1].indent > indent) {
+      stack.pop();
+    }
+
+    if (stack[stack.length - 1].indent === indent) {
+      // Same mapping scope as the top frame — check and record the key.
+      const frame = stack[stack.length - 1];
+      if (frame.seen.has(key)) {
+        duplicates.push({ key, line: i + 1 });
+      } else {
+        frame.seen.set(key, i + 1);
+      }
     } else {
-      seen.set(scopeKey, i + 1);
+      // Deeper than the current top — push a new child scope for this level.
+      stack.push({ indent, seen: new Map([[key, i + 1]]) });
     }
   }
 
