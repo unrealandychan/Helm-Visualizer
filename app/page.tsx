@@ -314,7 +314,7 @@ export default function Home() {
                   <select
                     value={theme}
                     onChange={(e) => setTheme(e.target.value as ThemeId)}
-                    className="bg-zinc-700 hover:bg-zinc-600 text-zinc-300 border border-zinc-600 rounded px-2 py-1 text-xs"
+                    className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 rounded px-2 py-1 text-xs transition-colors"
                     aria-label="Select color theme"
                   >
                     {THEMES.map((option) => (
