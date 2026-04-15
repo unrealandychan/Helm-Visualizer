@@ -154,8 +154,10 @@ export function ChartLoader({ onLoad, history = [] }: ChartLoaderProps) {
     // Advance progress step every ~1.2 s through the first three stages
     setProgressStep(0);
     let step = 0;
+    // Stop auto-advance one step before the last so "Rendering" stays until the response arrives
+    const MAX_AUTO_STEP = PROGRESS_STEPS.length - 2;
     progressTimerRef.current = setInterval(() => {
-      step = Math.min(step + 1, PROGRESS_STEPS.length - 2); // stay at "Rendering" until done
+      step = Math.min(step + 1, MAX_AUTO_STEP);
       setProgressStep(step);
     }, 1200);
 
@@ -179,7 +181,9 @@ export function ChartLoader({ onLoad, history = [] }: ChartLoaderProps) {
       setError(e instanceof Error ? e.message : "Request failed");
     } finally {
       setLoading(false);
-      setTimeout(() => setProgressStep(-1), 600); // brief pause so user sees 100%
+      // Brief delay so the user sees the completed bar before it disappears
+      const PROGRESS_COMPLETION_DELAY_MS = 600;
+      setTimeout(() => setProgressStep(-1), PROGRESS_COMPLETION_DELAY_MS);
     }
   }
 

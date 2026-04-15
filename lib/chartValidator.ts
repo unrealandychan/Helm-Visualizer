@@ -13,6 +13,14 @@ interface ChartYamlShape {
 }
 
 /**
+ * Matches a YAML mapping key line: optional leading whitespace followed by
+ * a key (no colons, brackets, braces, block indicators, quotes, anchors, or
+ * leading whitespace), then a colon and whitespace delimiter.
+ * Groups: (1) leading indent, (2) key text.
+ */
+const YAML_KEY_RE = /^(\s*)([^:#\[\]{},|>'"&*\s][^:#\[\]{},]*?):\s/;
+
+/**
  * Scan raw YAML text for duplicate mapping keys at the same indentation scope.
  * Returns every duplicate occurrence with a 1-based line number.
  *
@@ -32,9 +40,7 @@ export function findDuplicateKeys(content: string): Array<{ key: string; line: n
     // Skip blank lines, comments, and list items
     if (!trimmed || trimmed.startsWith("#") || trimmed.startsWith("- ")) continue;
 
-    // Match a YAML mapping key:  <indent><key>:
-    // Key characters: anything except colon, brackets, braces, hash, whitespace at start
-    const match = raw.match(/^(\s*)([^:#\[\]{},|>'"&*\s][^:#\[\]{},]*?):\s/);
+    const match = raw.match(YAML_KEY_RE);
     if (!match) continue;
 
     const indentWidth = match[1].length;

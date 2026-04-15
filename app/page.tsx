@@ -10,7 +10,7 @@ import { EnvSwitcher } from "@/components/EnvSwitcher";
 import { EnvDiffPanel } from "@/components/EnvDiffPanel";
 import { WelcomeScreen } from "@/components/WelcomeScreen";
 import { ChatBot } from "@/components/ChatBot";
-import { LayoutGrid, GitBranch, ChevronDown, ChevronUp, Download, AlertTriangle, Layers, FileImage, FileJson, FileText, Image as ImageIcon } from "lucide-react";
+import { LayoutGrid, GitBranch, ChevronDown, ChevronUp, Download, AlertTriangle, Layers, FileImage, FileJson, FileText, Image as ImageIcon, X } from "lucide-react";
 import yaml from "js-yaml";
 import type {
   ChartRenderResult,
@@ -395,10 +395,10 @@ export default function Home() {
             </div>
             <button
               onClick={() => setValidationDismissed(true)}
-              className="text-amber-500 hover:text-amber-300 text-xs shrink-0 transition-colors"
+              className="text-amber-500 hover:text-amber-300 shrink-0 transition-colors"
               aria-label="Dismiss warnings"
             >
-              ✕
+              <X className="w-4 h-4" />
             </button>
           </div>
         );
