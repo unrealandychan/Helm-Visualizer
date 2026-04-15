@@ -2,6 +2,10 @@ import type { ChartRenderResult, ChartSuggestion, EnvRenderResult } from "@/type
 
 const PROD_ENV_RE = /^(prod|prd|production)$/i;
 const BEST_PRACTICE_REF = "References: [2], [5], [6].";
+const DEFAULT_IMAGE_TAG_RECOMMENDATION = "stable";
+const MIN_REPLICA_COUNT = 1;
+const DEFAULT_REPLICA_RECOMMENDATION = 2;
+const DEFAULT_PROD_REPLICA_RECOMMENDATION = 3;
 
 export function analyzeChartSuggestions(result: ChartRenderResult | null): ChartSuggestion[] {
   if (!result) return [];
@@ -23,7 +27,7 @@ export function analyzeChartSuggestions(result: ChartRenderResult | null): Chart
       level: "high",
       title: "No explicit image tag key detected",
       keyPath: "image.tag",
-      recommendation: result.chartMeta.appVersion || result.chartMeta.version || "stable",
+      recommendation: result.chartMeta.appVersion || result.chartMeta.version || DEFAULT_IMAGE_TAG_RECOMMENDATION,
       rationale: `Pin image tags in values to avoid drifting deployments caused by mutable tags. ${BEST_PRACTICE_REF}`,
     });
   }
@@ -37,7 +41,7 @@ export function analyzeChartSuggestions(result: ChartRenderResult | null): Chart
         level: "high",
         title: "Image tag is not pinned",
         keyPath,
-        recommendation: result.chartMeta.appVersion || result.chartMeta.version || "stable",
+        recommendation: result.chartMeta.appVersion || result.chartMeta.version || DEFAULT_IMAGE_TAG_RECOMMENDATION,
         rationale: `Set a deterministic image tag for reproducible rollouts and safer rollbacks. ${BEST_PRACTICE_REF}`,
       });
     }
@@ -48,7 +52,7 @@ export function analyzeChartSuggestions(result: ChartRenderResult | null): Chart
         const fallbackRecommendation =
           typeof value === "string" && value.trim()
             ? value
-            : (result.chartMeta.appVersion || result.chartMeta.version || "stable");
+            : (result.chartMeta.appVersion || result.chartMeta.version || DEFAULT_IMAGE_TAG_RECOMMENDATION);
         suggestions.push({
           id: `${env.env}:${keyPath}:override-missing`,
           env: env.env,
@@ -64,14 +68,14 @@ export function analyzeChartSuggestions(result: ChartRenderResult | null): Chart
 
   for (const keyPath of replicaKeys) {
     const value = getByPath(defaultEnv.valuesTree.raw, keyPath);
-    if (typeof value !== "number" || Number.isNaN(value) || value < 1) {
+    if (typeof value !== "number" || Number.isNaN(value) || value < MIN_REPLICA_COUNT) {
       suggestions.push({
         id: `default:${keyPath}:missing`,
         env: defaultEnv.env,
         level: "high",
         title: "replicaCount is missing or invalid",
         keyPath,
-        recommendation: 2,
+        recommendation: DEFAULT_REPLICA_RECOMMENDATION,
         rationale: `Define replica counts explicitly to avoid implicit single-replica defaults in workloads. ${BEST_PRACTICE_REF}`,
       });
     }
@@ -86,7 +90,7 @@ export function analyzeChartSuggestions(result: ChartRenderResult | null): Chart
           level: "medium",
           title: "Production replicaCount override missing",
           keyPath,
-          recommendation: typeof value === "number" && value >= 1 ? value : 3,
+          recommendation: typeof value === "number" && value >= MIN_REPLICA_COUNT ? value : DEFAULT_PROD_REPLICA_RECOMMENDATION,
           rationale: `Production overrides should set replica counts intentionally for predictable scaling behavior. ${BEST_PRACTICE_REF}`,
         });
       }
@@ -113,14 +117,11 @@ export function analyzeChartSuggestions(result: ChartRenderResult | null): Chart
 
 export function applySuggestionToEnv(env: EnvRenderResult, suggestion: ChartSuggestion): EnvRenderResult {
   if (!suggestion.recommendation || env.env !== suggestion.env) return env;
-  const raw = structuredClone(env.valuesTree.raw);
-  setByPath(raw, suggestion.keyPath, suggestion.recommendation);
   const entries = upsertEntry(env.valuesTree.entries, suggestion.keyPath, suggestion.recommendation);
   return {
     ...env,
     valuesTree: {
       ...env.valuesTree,
-      raw,
       entries,
     },
   };
@@ -170,9 +171,9 @@ function inferType(value: unknown): "string" | "number" | "boolean" | "object" |
 function hasPath(obj: Record<string, unknown>, path: string): boolean {
   const parts = path.split(".");
   let cur: unknown = obj;
-  for (const p of parts) {
-    if (!cur || typeof cur !== "object" || !(p in (cur as Record<string, unknown>))) return false;
-    cur = (cur as Record<string, unknown>)[p];
+  for (const segment of parts) {
+    if (!cur || typeof cur !== "object" || !(segment in (cur as Record<string, unknown>))) return false;
+    cur = (cur as Record<string, unknown>)[segment];
   }
   return true;
 }
@@ -180,28 +181,9 @@ function hasPath(obj: Record<string, unknown>, path: string): boolean {
 function getByPath(obj: Record<string, unknown>, path: string): unknown {
   const parts = path.split(".");
   let cur: unknown = obj;
-  for (const p of parts) {
-    if (!cur || typeof cur !== "object" || !(p in (cur as Record<string, unknown>))) return undefined;
-    cur = (cur as Record<string, unknown>)[p];
+  for (const segment of parts) {
+    if (!cur || typeof cur !== "object" || !(segment in (cur as Record<string, unknown>))) return undefined;
+    cur = (cur as Record<string, unknown>)[segment];
   }
   return cur;
-}
-
-function setByPath(obj: Record<string, unknown>, path: string, value: unknown): void {
-  const parts = path.split(".");
-  if (parts.some(isUnsafePathSegment)) return;
-  let cur: Record<string, unknown> = obj;
-  for (let i = 0; i < parts.length - 1; i++) {
-    const part = parts[i];
-    const existing = cur[part];
-    if (!existing || typeof existing !== "object" || Array.isArray(existing)) {
-      cur[part] = {};
-    }
-    cur = cur[part] as Record<string, unknown>;
-  }
-  cur[parts[parts.length - 1]] = value;
-}
-
-function isUnsafePathSegment(part: string): boolean {
-  return part === "__proto__" || part === "prototype" || part === "constructor";
 }

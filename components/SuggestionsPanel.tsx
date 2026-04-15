@@ -85,9 +85,13 @@ export function SuggestionsPanel({
                     onClick={() => onExplain(s)}
                     disabled={explainingId === s.id}
                     className="text-[11px] px-2 py-1 rounded bg-violet-800/70 hover:bg-violet-700 text-violet-100 disabled:opacity-50"
+                    aria-label={explainingId === s.id ? "Generating AI explanation" : "Explain with AI"}
                   >
                     {explainingId === s.id ? (
-                      <span className="inline-flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" />Explaining</span>
+                      <span className="inline-flex items-center gap-1" aria-live="polite">
+                        <Loader2 className="w-3 h-3 animate-spin" aria-hidden="true" />
+                        Explaining
+                      </span>
                     ) : "Explain"}
                   </button>
                   {s.recommendation !== undefined && (

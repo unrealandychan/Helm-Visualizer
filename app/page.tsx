@@ -29,6 +29,7 @@ import { analyzeChartSuggestions, applySuggestionToEnv } from "@/lib/chartSugges
 
 const HISTORY_KEY = "helm-viz-history";
 const MAX_HISTORY = 8;
+const MAX_VALUES_TREE_ENTRIES_FOR_LLM = 200;
 
 export interface HistoryEntry {
   id: string;
@@ -272,7 +273,8 @@ export default function Home() {
             kind: r.kind,
             metadata: { name: r.metadata?.name, namespace: r.metadata?.namespace },
           })),
-          valuesTree: { entries: env.valuesTree.entries.slice(0, 200) },
+          // Keep this bounded so explain requests stay responsive and within LLM payload limits.
+          valuesTree: { entries: env.valuesTree.entries.slice(0, MAX_VALUES_TREE_ENTRIES_FOR_LLM) },
         })),
       };
 
@@ -299,7 +301,7 @@ export default function Home() {
         const json = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
         setLlmExplanations((prev) => ({
           ...prev,
-          [suggestion.id]: `Could not get AI explanation: ${json.error ?? "unknown error"}`,
+          [suggestion.id]: `Failed to generate explanation: ${json.error ?? `HTTP ${res.status}`}`,
         }));
         return;
       }
