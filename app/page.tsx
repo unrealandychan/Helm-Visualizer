@@ -373,7 +373,7 @@ export default function Home() {
                       onClick={() => { setShowManifest((v) => !v); setShowBurgerMenu(false); }}
                       className={`w-full flex items-center gap-2 px-3 py-2 text-xs transition-colors ${
                         showManifest
-                          ? "text-blue-400 bg-blue-950/40 hover:bg-blue-950/60"
+                          ? "text-blue-400 bg-blue-950/40 hover:bg-blue-950/40"
                           : "text-zinc-300 hover:bg-zinc-700"
                       }`}
                     >
