@@ -57,7 +57,9 @@ export function SuggestionsPanel({
                   />
                   <div className="min-w-0">
                     <p className="text-xs font-semibold text-zinc-100">{s.title}</p>
-                    <p className="text-[11px] text-zinc-400 mt-0.5">{s.env} · <code>{s.keyPath}</code></p>
+                    <p className="text-[11px] text-zinc-400 mt-0.5">
+                      {s.env} · <code>{s.keyPath}</code>
+                    </p>
                   </div>
                 </div>
                 <p className="text-[11px] text-zinc-300 leading-relaxed">{s.rationale}</p>

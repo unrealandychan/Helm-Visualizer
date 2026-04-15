@@ -304,8 +304,8 @@ export default function Home() {
         return;
       }
 
-      const sseBody = await res.text();
-      const explanation = extractStreamingText(sseBody).trim() || "No additional AI explanation returned.";
+      const streamingResponseBody = await res.text();
+      const explanation = extractStreamingText(streamingResponseBody).trim() || "No additional AI explanation returned.";
       setLlmExplanations((prev) => ({ ...prev, [suggestion.id]: explanation }));
     } catch (err) {
       setLlmExplanations((prev) => ({

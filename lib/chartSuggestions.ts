@@ -45,13 +45,17 @@ export function analyzeChartSuggestions(result: ChartRenderResult | null): Chart
     for (const env of result.environments) {
       if (env.env === defaultEnv.env) continue;
       if (PROD_ENV_RE.test(env.env) && !hasPath(env.valuesTree.raw, keyPath)) {
+        const fallbackRecommendation =
+          typeof value === "string" && value.trim()
+            ? value
+            : (result.chartMeta.appVersion || result.chartMeta.version || "stable");
         suggestions.push({
           id: `${env.env}:${keyPath}:override-missing`,
           env: env.env,
           level: "high",
           title: "Production override missing for image tag",
           keyPath,
-          recommendation: typeof value === "string" && value.trim() ? value : (result.chartMeta.appVersion || result.chartMeta.version || "stable"),
+          recommendation: fallbackRecommendation,
           rationale: `Set image tag explicitly in production overrides to keep releases auditable. ${BEST_PRACTICE_REF}`,
         });
       }
@@ -185,6 +189,7 @@ function getByPath(obj: Record<string, unknown>, path: string): unknown {
 
 function setByPath(obj: Record<string, unknown>, path: string, value: unknown): void {
   const parts = path.split(".");
+  if (parts.some(isUnsafePathSegment)) return;
   let cur: Record<string, unknown> = obj;
   for (let i = 0; i < parts.length - 1; i++) {
     const part = parts[i];
@@ -195,4 +200,8 @@ function setByPath(obj: Record<string, unknown>, path: string, value: unknown): 
     cur = cur[part] as Record<string, unknown>;
   }
   cur[parts[parts.length - 1]] = value;
+}
+
+function isUnsafePathSegment(part: string): boolean {
+  return part === "__proto__" || part === "prototype" || part === "constructor";
 }
