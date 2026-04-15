@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useRef } from "react";
-import { Upload, Globe, FolderOpen, Search, ChevronRight, AlertCircle, Clock, Zap, GitCompare } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { Upload, Globe, FolderOpen, Search, ChevronRight, AlertCircle, AlertTriangle, CheckCircle2, Clock, Zap, GitCompare } from "lucide-react";
 import clsx from "clsx";
 import yaml from "js-yaml";
-import type { ChartRenderResult, ArtifactHubPackage } from "@/types/helm";
+import type { ChartRenderResult, ArtifactHubPackage, ValidationIssue } from "@/types/helm";
 import type { HistoryEntry } from "@/app/page";
 import { extractValuesEntries } from "@/lib/yamlParser";
 import { computeValuesDiff } from "@/lib/valueDiff";
@@ -38,6 +38,14 @@ export function ChartLoader({ onLoad, history = [] }: ChartLoaderProps) {
   const [dragOver, setDragOver] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // Progress bar state
+  const PROGRESS_STEPS = ["Uploading", "Extracting", "Validating", "Rendering"] as const;
+  const [progressStep, setProgressStep] = useState<number>(-1); // -1 = idle
+  const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Validation warnings surfaced after a successful load
+  const [validationIssues, setValidationIssues] = useState<ValidationIssue[]>([]);
+
   // Artifact Hub state
   const [ahUrl, setAhUrl] = useState("");
   const [ahSearch, setAhSearch] = useState("");
@@ -55,6 +63,13 @@ export function ChartLoader({ onLoad, history = [] }: ChartLoaderProps) {
   const [compareDragOverB, setCompareDragOverB] = useState(false);
   const compareFileRefA = useRef<HTMLInputElement>(null);
   const compareFileRefB = useRef<HTMLInputElement>(null);
+
+  // Clean up progress timer on unmount
+  useEffect(() => {
+    return () => {
+      if (progressTimerRef.current) clearInterval(progressTimerRef.current);
+    };
+  }, []);
 
   async function loadWorkspaceChart() {
     await fetchWithLoading(() => fetch("/api/workspace-chart"), "workspace");
@@ -134,18 +149,41 @@ export function ChartLoader({ onLoad, history = [] }: ChartLoaderProps) {
   async function fetchWithLoading(fn: () => Promise<Response>, source: "workspace" | "upload" | "artifacthub", url?: string) {
     setLoading(true);
     setError(null);
+    setValidationIssues([]);
+
+    // Advance progress step every ~1.2 s through the first three stages
+    setProgressStep(0);
+    let step = 0;
+    // Stop auto-advance one step before the last so "Rendering" stays until the response arrives
+    const MAX_AUTO_STEP = PROGRESS_STEPS.length - 2;
+    progressTimerRef.current = setInterval(() => {
+      step = Math.min(step + 1, MAX_AUTO_STEP);
+      setProgressStep(step);
+    }, 1200);
+
     try {
       const res = await fn();
       const data = await res.json();
+      if (progressTimerRef.current) clearInterval(progressTimerRef.current);
+      setProgressStep(PROGRESS_STEPS.length - 1); // jump to final step
       if (!res.ok) {
         setError(data.error ?? `HTTP ${res.status}`);
         return;
       }
-      onLoad(data as ChartRenderResult, source, url);
+      const result = data as ChartRenderResult;
+      // Surface any validation warnings (errors would have caused a non-ok response)
+      if (result.validation?.issues?.length) {
+        setValidationIssues(result.validation.issues.filter((i) => i.level === "warning"));
+      }
+      onLoad(result, source, url);
     } catch (e) {
+      if (progressTimerRef.current) clearInterval(progressTimerRef.current);
       setError(e instanceof Error ? e.message : "Request failed");
     } finally {
       setLoading(false);
+      // Brief delay so the user sees the completed bar before it disappears
+      const PROGRESS_COMPLETION_DELAY_MS = 600;
+      setTimeout(() => setProgressStep(-1), PROGRESS_COMPLETION_DELAY_MS);
     }
   }
 
@@ -580,10 +618,56 @@ export function ChartLoader({ onLoad, history = [] }: ChartLoaderProps) {
         </div>
       )}
 
-      {/* Loading spinner overlay hint */}
-      {loading && (
-        <div className="mt-3 text-center text-zinc-400 text-xs animate-pulse">
-          Running helm template…
+      {/* Validation progress bar */}
+      {progressStep >= 0 && (
+        <div className="mt-4">
+          <div className="flex justify-between mb-1">
+            {PROGRESS_STEPS.map((label, i) => (
+              <span
+                key={label}
+                className={clsx(
+                  "text-[10px] font-medium transition-colors",
+                  i < progressStep
+                    ? "text-emerald-400"
+                    : i === progressStep
+                      ? "text-blue-300 animate-pulse"
+                      : "text-zinc-600"
+                )}
+              >
+                {i < progressStep ? <CheckCircle2 className="inline w-3 h-3 mr-0.5 -mt-0.5" /> : null}
+                {label}
+              </span>
+            ))}
+          </div>
+          <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-blue-500 rounded-full transition-all duration-500"
+              style={{
+                width: `${Math.round(((progressStep + 1) / PROGRESS_STEPS.length) * 100)}%`,
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Validation warnings */}
+      {validationIssues.length > 0 && !loading && (
+        <div className="mt-4 space-y-1.5">
+          <p className="text-xs text-amber-400 font-medium flex items-center gap-1">
+            <AlertTriangle className="w-3.5 h-3.5" />
+            {validationIssues.length} validation warning{validationIssues.length !== 1 ? "s" : ""}
+          </p>
+          <ul className="space-y-1 max-h-36 overflow-y-auto">
+            {validationIssues.map((issue, idx) => (
+              <li
+                key={idx}
+                className="flex items-start gap-2 bg-amber-950/40 border border-amber-800/50 rounded-lg px-2.5 py-1.5"
+              >
+                <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0 mt-0.5" />
+                <span className="text-amber-200 text-xs leading-snug">{issue.message}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
     </div>

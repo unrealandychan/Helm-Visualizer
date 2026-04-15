@@ -262,7 +262,7 @@ async function getOciToken(registry: string, repository: string): Promise<string
   if (authUrl.protocol !== "https:") {
     throw new Error("OCI auth realm must use HTTPS.");
   }
-  assertSafeHost(authUrl.hostname);
+  await assertSafeHostname(authUrl.hostname);
 
   if (service) authUrl.searchParams.set("service", service);
   authUrl.searchParams.set("scope", `repository:${repository}:pull`);

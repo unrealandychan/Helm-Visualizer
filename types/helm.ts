@@ -39,11 +39,34 @@ export interface ValuesTree {
   entries: ValuesEntry[];
 }
 
+// ──────────────────────────────────────────────
+// Chart validation types
+// ──────────────────────────────────────────────
+
+export interface ValidationIssue {
+  /** "error" blocks rendering; "warning" is informational */
+  level: "error" | "warning";
+  /** Human-readable description, e.g. "Fix line 23 in values-prod.yaml" */
+  message: string;
+  /** Source file relative to chart root, if applicable */
+  file?: string;
+  /** 1-based line number in the source file, if known */
+  line?: number;
+}
+
+export interface ValidationResult {
+  /** false when at least one error-level issue is present */
+  valid: boolean;
+  issues: ValidationIssue[];
+}
+
 /** Data returned by any of the three API routes */
 export interface ChartRenderResult {
   chartMeta: HelmChartMeta;
   environments: EnvRenderResult[];
   activeEnv: string;
+  /** Validation issues found during chart analysis */
+  validation?: ValidationResult;
 }
 
 export interface EnvRenderResult {
