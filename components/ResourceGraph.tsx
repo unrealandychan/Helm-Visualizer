@@ -24,6 +24,7 @@ import {
 } from "react";
 import { toPng, toSvg } from "html-to-image";
 import { ResourceNode } from "./ResourceNode";
+import clsx from "clsx";
 import type { ResourceGraphNode, ResourceGraphEdge, ResourceNodeData } from "@/types/helm";
 
 export interface ResourceGraphHandle {
@@ -37,6 +38,7 @@ interface ResourceGraphProps {
   highlightedKeys?: string[];
   onNodeSelect?: (data: ResourceNodeData | null) => void;
   exportFilename?: string;
+  theme?: "dark" | "light" | "high-contrast";
 }
 
 const nodeTypes = {
@@ -54,10 +56,11 @@ const VIEWPORT_SELECTOR = ".react-flow__viewport";
 interface ExportControllerProps {
   containerRef: React.RefObject<HTMLDivElement | null>;
   exportFilename: string;
+  exportBackground: string;
 }
 
 const ExportController = forwardRef<ResourceGraphHandle, ExportControllerProps>(
-  ({ containerRef, exportFilename }, ref) => {
+  ({ containerRef, exportFilename, exportBackground }, ref) => {
     const { getNodes } = useReactFlow();
 
     function getExportViewport() {
@@ -72,7 +75,7 @@ const ExportController = forwardRef<ResourceGraphHandle, ExportControllerProps>(
         if (!el) return;
         const { x, y, zoom } = getExportViewport();
         const dataUrl = await toPng(el, {
-          backgroundColor: "#09090b",
+          backgroundColor: exportBackground,
           width: IMAGE_WIDTH,
           height: IMAGE_HEIGHT,
           style: {
@@ -92,7 +95,7 @@ const ExportController = forwardRef<ResourceGraphHandle, ExportControllerProps>(
         if (!el) return;
         const { x, y, zoom } = getExportViewport();
         const dataUrl = await toSvg(el, {
-          backgroundColor: "#09090b",
+          backgroundColor: exportBackground,
           width: IMAGE_WIDTH,
           height: IMAGE_HEIGHT,
           style: {
@@ -124,10 +127,47 @@ function ResourceGraphInner(
     highlightedKeys = [],
     onNodeSelect,
     exportFilename = "helm-graph",
+    theme = "dark",
   }: ResourceGraphProps,
   ref: React.Ref<ResourceGraphHandle>
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const themeVisuals = useMemo(() => {
+    if (theme === "light") {
+      return {
+        colorMode: "light" as const,
+        edgeStroke: "#64748b",
+        edgeLabel: "#475569",
+        background: "#e2e8f0",
+        exportBackground: "#f8fafc",
+        controlsClass: "!bg-white !border-slate-300",
+        minimapClass: "!bg-slate-100 !border-slate-300",
+        minimapMask: "rgba(148,163,184,0.35)",
+      };
+    }
+    if (theme === "high-contrast") {
+      return {
+        colorMode: "dark" as const,
+        edgeStroke: "#a3a3a3",
+        edgeLabel: "#f5f5f5",
+        background: "#525252",
+        exportBackground: "#000000",
+        controlsClass: "!bg-black !border-white",
+        minimapClass: "!bg-black !border-white",
+        minimapMask: "rgba(0,0,0,0.65)",
+      };
+    }
+    return {
+      colorMode: "dark" as const,
+      edgeStroke: "#6b7280",
+      edgeLabel: "#9ca3af",
+      background: "#27272a",
+      exportBackground: "#09090b",
+      controlsClass: "!bg-zinc-800 !border-zinc-700",
+      minimapClass: "!bg-zinc-900 !border-zinc-700",
+      minimapMask: "rgba(0,0,0,0.5)",
+    };
+  }, [theme]);
 
   // Apply highlight state to nodes
   const annotatedNodes = useMemo(() => {
@@ -180,26 +220,31 @@ function ResourceGraphInner(
         fitViewOptions={{ padding: 0.2 }}
         minZoom={0.1}
         maxZoom={2}
-        colorMode="dark"
+        colorMode={themeVisuals.colorMode}
         defaultEdgeOptions={{
-          style: { stroke: "#6b7280" },
-          labelStyle: { fill: "#9ca3af", fontSize: 10 },
+          style: { stroke: themeVisuals.edgeStroke },
+          labelStyle: { fill: themeVisuals.edgeLabel, fontSize: 10 },
           labelBgStyle: { fill: "transparent" },
         }}
       >
         {/* ExportController is a child of ReactFlow so it can use useReactFlow() */}
-        <ExportController ref={ref} containerRef={containerRef} exportFilename={exportFilename} />
+        <ExportController
+          ref={ref}
+          containerRef={containerRef}
+          exportFilename={exportFilename}
+          exportBackground={themeVisuals.exportBackground}
+        />
         <Background
           variant={BackgroundVariant.Dots}
           gap={20}
           size={1}
-          color="#27272a"
+          color={themeVisuals.background}
         />
-        <Controls className="!bg-zinc-800 !border-zinc-700" />
+        <Controls className={clsx(themeVisuals.controlsClass)} />
         <MiniMap
           nodeColor={(n) => kindToMiniMapColor((n.data as ResourceNodeData)?.kind ?? "Unknown")}
-          className="!bg-zinc-900 !border-zinc-700"
-          maskColor="rgba(0,0,0,0.5)"
+          className={clsx(themeVisuals.minimapClass)}
+          maskColor={themeVisuals.minimapMask}
         />
       </ReactFlow>
     </div>

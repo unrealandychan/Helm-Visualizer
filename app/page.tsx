@@ -26,6 +26,13 @@ import type { ResourceGraphHandle } from "@/components/ResourceGraph";
 
 const HISTORY_KEY = "helm-viz-history";
 const MAX_HISTORY = 8;
+const THEME_KEY = "helm-viz-theme";
+const THEMES = [
+  { id: "dark", label: "Dark" },
+  { id: "light", label: "Light" },
+  { id: "high-contrast", label: "High Contrast" },
+] as const;
+type ThemeId = (typeof THEMES)[number]["id"];
 
 export interface HistoryEntry {
   id: string;
@@ -111,6 +118,7 @@ export default function Home() {
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [exportingType, setExportingType] = useState<string | null>(null);
   const [validationDismissed, setValidationDismissed] = useState(false);
+  const [theme, setTheme] = useState<ThemeId>("dark");
   const graphRef = useRef<ResourceGraphHandle>(null);
   const exportMenuRef = useRef<HTMLDivElement>(null);
 
@@ -139,6 +147,18 @@ export default function Home() {
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem(THEME_KEY);
+    if (savedTheme && THEMES.some((t) => t.id === savedTheme)) {
+      setTheme(savedTheme as ThemeId);
+    }
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    localStorage.setItem(THEME_KEY, theme);
+  }, [theme]);
 
   const handleChartLoad = useCallback((result: ChartRenderResult, source: "workspace" | "upload" | "artifacthub" = "workspace", url?: string) => {
     setChartResult(result);
@@ -262,6 +282,21 @@ export default function Home() {
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          <label className="flex items-center gap-2 text-xs text-zinc-400">
+            Theme
+            <select
+              value={theme}
+              onChange={(e) => setTheme(e.target.value as ThemeId)}
+              className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 rounded-lg px-2 py-1.5"
+              aria-label="Select color theme"
+            >
+              {THEMES.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
           {chartResult && (
             <>
               <button
@@ -433,6 +468,7 @@ export default function Home() {
                 highlightedKeys={highlightedKeys}
                 onNodeSelect={setSelectedResource}
                 exportFilename={chartResult ? `${chartResult.chartMeta.name}-${activeEnv}-graph` : "helm-graph"}
+                theme={theme}
               />
             )
           )}
