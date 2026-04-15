@@ -10,7 +10,7 @@ import { EnvSwitcher } from "@/components/EnvSwitcher";
 import { EnvDiffPanel } from "@/components/EnvDiffPanel";
 import { WelcomeScreen } from "@/components/WelcomeScreen";
 import { ChatBot } from "@/components/ChatBot";
-import { LayoutGrid, GitBranch, ChevronUp, Download, AlertTriangle, Layers, FileImage, FileJson, FileText, Image as ImageIcon, X, Menu } from "lucide-react";
+import { LayoutGrid, GitBranch, ChevronUp, ChevronDown, Download, AlertTriangle, Layers, FileImage, FileJson, FileText, Image as ImageIcon, X, Menu } from "lucide-react";
 import yaml from "js-yaml";
 import type {
   ChartRenderResult,
