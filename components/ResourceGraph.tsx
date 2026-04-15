@@ -48,6 +48,38 @@ const nodeTypes = {
 const IMAGE_WIDTH = 1920;
 const IMAGE_HEIGHT = 1080;
 const VIEWPORT_SELECTOR = ".react-flow__viewport";
+const THEME_VISUALS = {
+  light: {
+    colorMode: "light" as const,
+    edgeStroke: "#64748b",
+    edgeLabel: "#475569",
+    background: "#e2e8f0",
+    exportBackground: "#f8fafc",
+    controlsClass: "!bg-white !border-slate-300",
+    minimapClass: "!bg-slate-100 !border-slate-300",
+    minimapMask: "rgba(148,163,184,0.35)",
+  },
+  "high-contrast": {
+    colorMode: "dark" as const,
+    edgeStroke: "#a3a3a3",
+    edgeLabel: "#f5f5f5",
+    background: "#525252",
+    exportBackground: "#000000",
+    controlsClass: "!bg-black !border-white",
+    minimapClass: "!bg-black !border-white",
+    minimapMask: "rgba(0,0,0,0.65)",
+  },
+  dark: {
+    colorMode: "dark" as const,
+    edgeStroke: "#6b7280",
+    edgeLabel: "#9ca3af",
+    background: "#27272a",
+    exportBackground: "#09090b",
+    controlsClass: "!bg-zinc-800 !border-zinc-700",
+    minimapClass: "!bg-zinc-900 !border-zinc-700",
+    minimapMask: "rgba(0,0,0,0.5)",
+  },
+} as const;
 
 // ──────────────────────────────────────────────
 // ExportController — rendered INSIDE <ReactFlow> so it has access to the RF context
@@ -132,42 +164,7 @@ function ResourceGraphInner(
   ref: React.Ref<ResourceGraphHandle>
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const themeVisuals = useMemo(() => {
-    if (theme === "light") {
-      return {
-        colorMode: "light" as const,
-        edgeStroke: "#64748b",
-        edgeLabel: "#475569",
-        background: "#e2e8f0",
-        exportBackground: "#f8fafc",
-        controlsClass: "!bg-white !border-slate-300",
-        minimapClass: "!bg-slate-100 !border-slate-300",
-        minimapMask: "rgba(148,163,184,0.35)",
-      };
-    }
-    if (theme === "high-contrast") {
-      return {
-        colorMode: "dark" as const,
-        edgeStroke: "#a3a3a3",
-        edgeLabel: "#f5f5f5",
-        background: "#525252",
-        exportBackground: "#000000",
-        controlsClass: "!bg-black !border-white",
-        minimapClass: "!bg-black !border-white",
-        minimapMask: "rgba(0,0,0,0.65)",
-      };
-    }
-    return {
-      colorMode: "dark" as const,
-      edgeStroke: "#6b7280",
-      edgeLabel: "#9ca3af",
-      background: "#27272a",
-      exportBackground: "#09090b",
-      controlsClass: "!bg-zinc-800 !border-zinc-700",
-      minimapClass: "!bg-zinc-900 !border-zinc-700",
-      minimapMask: "rgba(0,0,0,0.5)",
-    };
-  }, [theme]);
+  const themeVisuals = THEME_VISUALS[theme];
 
   // Apply highlight state to nodes
   const annotatedNodes = useMemo(() => {

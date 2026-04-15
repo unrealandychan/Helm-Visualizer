@@ -149,6 +149,7 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
     const savedTheme = localStorage.getItem(THEME_KEY);
     if (savedTheme && THEMES.some((t) => t.id === savedTheme)) {
       setTheme(savedTheme as ThemeId);
@@ -156,6 +157,7 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
     document.documentElement.dataset.theme = theme;
     localStorage.setItem(THEME_KEY, theme);
   }, [theme]);
