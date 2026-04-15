@@ -110,6 +110,7 @@ export default function Home() {
   const [selectedValueKey, setSelectedValueKey] = useState<string | null>(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [exportingType, setExportingType] = useState<string | null>(null);
+  const [validationDismissed, setValidationDismissed] = useState(false);
   const graphRef = useRef<ResourceGraphHandle>(null);
   const exportMenuRef = useRef<HTMLDivElement>(null);
 
@@ -145,6 +146,7 @@ export default function Home() {
     setDiffEnv(null);
     setSelectedResource(null);
     setShowLoader(false);
+    setValidationDismissed(false);
 
     const entry: HistoryEntry = {
       id: crypto.randomUUID(),
@@ -378,6 +380,29 @@ export default function Home() {
           onViewDiff={diffResult ? () => setShowDiffPanel(true) : undefined}
         />
       )}
+
+      {/* Validation warnings banner */}
+      {chartResult && !validationDismissed && (() => {
+        const warns = chartResult.validation?.issues?.filter((i) => i.level === "warning") ?? [];
+        if (warns.length === 0) return null;
+        return (
+          <div className="shrink-0 bg-amber-950/60 border-b border-amber-800/60 px-4 py-2 flex items-start gap-3">
+            <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0 space-y-0.5">
+              {warns.map((issue, idx) => (
+                <p key={idx} className="text-amber-200 text-xs leading-snug">{issue.message}</p>
+              ))}
+            </div>
+            <button
+              onClick={() => setValidationDismissed(true)}
+              className="text-amber-500 hover:text-amber-300 text-xs shrink-0 transition-colors"
+              aria-label="Dismiss warnings"
+            >
+              ✕
+            </button>
+          </div>
+        );
+      })()}
 
       {showDiffPanel && diffResult && diffEnv && (
         <EnvDiffPanel

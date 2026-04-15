@@ -6,6 +6,7 @@ import type { ChartRenderResult, EnvRenderResult, HelmChartMeta } from "@/types/
 import { runHelmTemplate } from "@/lib/helmRunner";
 import { parseMultiDocYaml, extractValuesEntries } from "@/lib/yamlParser";
 import { buildGraph } from "@/lib/graphBuilder";
+import { validateChart } from "@/lib/chartValidator";
 import yaml from "js-yaml";
 
 export function extractEnvName(valuesFilePath: string): string {
@@ -15,9 +16,16 @@ export function extractEnvName(valuesFilePath: string): string {
 }
 
 export async function renderChart(chartDir: string): Promise<NextResponse> {
-  if (!existsSync(path.join(chartDir, "Chart.yaml"))) {
+  // Run structural validation first — returns actionable errors/warnings
+  const validation = await validateChart(chartDir);
+  if (!validation.valid) {
+    // Return the first error as the primary message, plus all issues
+    const firstError = validation.issues.find((i) => i.level === "error");
     return NextResponse.json(
-      { error: "No Chart.yaml found in the archive. Is this a valid Helm chart?" },
+      {
+        error: firstError?.message ?? "Chart validation failed.",
+        validation,
+      },
       { status: 422 }
     );
   }
@@ -82,5 +90,6 @@ export async function renderChart(chartDir: string): Promise<NextResponse> {
     chartMeta,
     environments,
     activeEnv: environments[0]?.env ?? "default",
+    validation,
   } as ChartRenderResult);
 }
