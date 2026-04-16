@@ -105,6 +105,10 @@ export type K8sKind =
   | "DaemonSet"
   | "Job"
   | "PersistentVolumeClaim"
+  | "ClusterRole"
+  | "ClusterRoleBinding"
+  | "Role"
+  | "RoleBinding"
   | "Unknown";
 
 export interface ResourceNodeData extends Record<string, unknown> {

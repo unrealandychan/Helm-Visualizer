@@ -26,6 +26,10 @@ const KNOWN_KINDS: Set<string> = new Set([
   "DaemonSet",
   "Job",
   "PersistentVolumeClaim",
+  "ClusterRole",
+  "ClusterRoleBinding",
+  "Role",
+  "RoleBinding",
 ]);
 
 function classifyKind(kind: string): K8sKind {
@@ -56,12 +60,19 @@ function inferEdges(resources: K8sResource[]): Edge[] {
   const cronJobs = resources.filter((r) => r.kind === "CronJob");
   const configMaps = resources.filter((r) => r.kind === "ConfigMap");
   const secrets = resources.filter((r) => r.kind === "Secret");
+  const roleBindings = resources.filter(
+    (r) => r.kind === "RoleBinding" || r.kind === "ClusterRoleBinding"
+  );
 
   // O(1) name-based lookup maps — avoids O(n) Array.find() inside loops
   const servicesByName = new Map(services.map((s) => [s.metadata.name, s]));
   const configMapsByName = new Map(configMaps.map((c) => [c.metadata.name, c]));
   const secretsByName = new Map(secrets.map((s) => [s.metadata.name, s]));
   const serviceAccountsByName = new Map(serviceAccounts.map((sa) => [sa.metadata.name, sa]));
+  // Namespace-aware SA lookup for RBAC subject resolution (namespace/name)
+  const serviceAccountsByNsAndName = new Map(
+    serviceAccounts.map((sa) => [`${sa.metadata?.namespace ?? ""}/${sa.metadata.name}`, sa])
+  );
   // For HPA scaleTargetRef we need lookup by "kind/name"
   const resourcesByKindAndName = new Map(
     resources.map((r) => [`${r.kind}/${r.metadata.name}`, r])
@@ -170,6 +181,64 @@ function inferEdges(resources: K8sResource[]): Edge[] {
       const sa = serviceAccountsByName.get(saName);
       if (sa) {
         addEdge(nodeId(sa), nodeId(workload), "bound to");
+      }
+    }
+  }
+
+  // RoleBinding / ClusterRoleBinding → Role / ClusterRole (via roleRef)
+  // RoleBinding / ClusterRoleBinding → ServiceAccount (via subjects[])
+  const resolveRoleRefTarget = (
+    rb: K8sResource,
+    refKind: string,
+    refName: string,
+  ): K8sResource | undefined => {
+    if (refKind === "Role") {
+      const rbNamespace = rb.metadata?.namespace;
+      return Array.from(resourcesByKindAndName.values()).find((resource) => {
+        return (
+          resource.kind === "Role" &&
+          resource.metadata?.name === refName &&
+          resource.metadata?.namespace === rbNamespace
+        );
+      });
+    }
+
+    return resourcesByKindAndName.get(`${refKind}/${refName}`);
+  };
+
+  for (const rb of roleBindings) {
+    const roleRef = (rb as Record<string, unknown>).roleRef as Record<string, unknown> | undefined;
+    if (roleRef) {
+      const refKind = roleRef.kind as string | undefined;
+      const refName = roleRef.name as string | undefined;
+      if (refKind && refName) {
+        const role = resolveRoleRefTarget(rb, refKind, refName);
+        if (role) {
+          addEdge(nodeId(role), nodeId(rb), "binds");
+        }
+      }
+    }
+
+    const subjects = (rb as Record<string, unknown>).subjects as
+      | Array<Record<string, unknown>>
+      | undefined;
+    if (subjects) {
+      for (const subject of subjects) {
+        if (subject.kind === "ServiceAccount") {
+          const saName = subject.name as string | undefined;
+          if (saName) {
+            // Resolve SA namespace: use explicit subject.namespace, then fall back
+            // to the binding's own namespace (applies to RoleBinding subjects that
+            // default to the binding namespace per the Kubernetes spec)
+            const saNs = (subject.namespace as string | undefined) ?? rb.metadata?.namespace ?? "";
+            const sa =
+              serviceAccountsByNsAndName.get(`${saNs}/${saName}`) ??
+              serviceAccountsByName.get(saName);
+            if (sa) {
+              addEdge(nodeId(rb), nodeId(sa), "grants");
+            }
+          }
+        }
       }
     }
   }

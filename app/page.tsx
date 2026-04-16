@@ -11,7 +11,7 @@ import { EnvDiffPanel } from "@/components/EnvDiffPanel";
 import { WelcomeScreen } from "@/components/WelcomeScreen";
 import { ChatBot } from "@/components/ChatBot";
 import { SuggestionsPanel } from "@/components/SuggestionsPanel";
-import { LayoutGrid, GitBranch, ChevronDown, ChevronUp, Download, AlertTriangle, Layers, FileImage, FileJson, FileText, Image as ImageIcon, X } from "lucide-react";
+import { LayoutGrid, GitBranch, ChevronUp, ChevronDown, Download, AlertTriangle, Layers, FileImage, FileJson, FileText, Image as ImageIcon, X, Menu } from "lucide-react";
 import yaml from "js-yaml";
 import type {
   ChartRenderResult,
@@ -30,6 +30,13 @@ import { analyzeChartSuggestions, applySuggestionToEnv } from "@/lib/chartSugges
 const HISTORY_KEY = "helm-viz-history";
 const MAX_HISTORY = 8;
 const MAX_VALUES_TREE_ENTRIES_FOR_LLM = 200;
+const THEME_KEY = "helm-viz-theme";
+const THEMES = [
+  { id: "dark", label: "Dark" },
+  { id: "light", label: "Light" },
+  { id: "high-contrast", label: "High Contrast" },
+] as const;
+type ThemeId = (typeof THEMES)[number]["id"];
 
 export interface HistoryEntry {
   id: string;
@@ -112,26 +119,27 @@ export default function Home() {
   const [showDiffPanel, setShowDiffPanel] = useState(false);
   const [showManifest, setShowManifest] = useState(false);
   const [selectedValueKey, setSelectedValueKey] = useState<string | null>(null);
-  const [showExportMenu, setShowExportMenu] = useState(false);
   const [exportingType, setExportingType] = useState<string | null>(null);
   const [validationDismissed, setValidationDismissed] = useState(false);
   const [ignoredSuggestionIds, setIgnoredSuggestionIds] = useState<Set<string>>(new Set());
   const [llmExplanations, setLlmExplanations] = useState<Record<string, string>>({});
   const [explainingSuggestionId, setExplainingSuggestionId] = useState<string | null>(null);
+  const [theme, setTheme] = useState<ThemeId>("dark");
+  const [showBurgerMenu, setShowBurgerMenu] = useState(false);
   const graphRef = useRef<ResourceGraphHandle>(null);
-  const exportMenuRef = useRef<HTMLDivElement>(null);
+  const burgerMenuRef = useRef<HTMLDivElement>(null);
 
-  // Close export menu when clicking outside
+  // Close burger menu when clicking outside
   useEffect(() => {
-    if (!showExportMenu) return;
+    if (!showBurgerMenu) return;
     function handleClick(e: MouseEvent) {
-      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
-        setShowExportMenu(false);
+      if (burgerMenuRef.current && !burgerMenuRef.current.contains(e.target as Node)) {
+        setShowBurgerMenu(false);
       }
     }
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
-  }, [showExportMenu]);
+  }, [showBurgerMenu]);
 
   useEffect(() => {
     setHistory(loadHistory());
@@ -146,6 +154,20 @@ export default function Home() {
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const savedTheme = localStorage.getItem(THEME_KEY);
+    if (savedTheme && THEMES.some((t) => t.id === savedTheme)) {
+      setTheme(savedTheme as ThemeId);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    document.documentElement.dataset.theme = theme;
+    localStorage.setItem(THEME_KEY, theme);
+  }, [theme]);
 
   const handleChartLoad = useCallback((result: ChartRenderResult, source: "workspace" | "upload" | "artifacthub" = "workspace", url?: string) => {
     setChartResult(result);
@@ -190,7 +212,6 @@ export default function Home() {
   async function handleGraphExport(type: "png" | "svg" | "json" | "markdown") {
     if (!chartResult) return;
     setExportingType(type);
-    setShowExportMenu(false);
     try {
       const basename = `${chartResult.chartMeta.name}-${activeEnv}-graph`;
 
@@ -352,76 +373,6 @@ export default function Home() {
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {chartResult && (
-            <>
-              <button
-                onClick={exportYaml}
-                className="flex items-center gap-1.5 text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-3 py-1.5 rounded-lg transition-colors"
-                title={`Export ${activeEnv} YAML`}
-              >
-                <Download className="w-3.5 h-3.5" />
-                Export YAML
-              </button>
-              {/* Graph export dropdown */}
-              <div className="relative" ref={exportMenuRef}>
-                <button
-                  onClick={() => setShowExportMenu((v) => !v)}
-                  className="flex items-center gap-1.5 text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-3 py-1.5 rounded-lg transition-colors"
-                  title="Export graph view"
-                  disabled={!!exportingType}
-                >
-                  <FileImage className="w-3.5 h-3.5" />
-                  {exportingType ? "Exporting…" : "Export Graph"}
-                  <ChevronDown className="w-3 h-3 ml-0.5" />
-                </button>
-                {showExportMenu && (
-                  <div className="absolute right-0 top-full mt-1 w-44 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl z-50 overflow-hidden">
-                    <button
-                      onClick={() => handleGraphExport("png")}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-700 transition-colors"
-                    >
-                      <ImageIcon className="w-3.5 h-3.5 text-blue-400" />
-                      PNG image
-                    </button>
-                    <button
-                      onClick={() => handleGraphExport("svg")}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-700 transition-colors"
-                    >
-                      <FileImage className="w-3.5 h-3.5 text-green-400" />
-                      SVG image
-                    </button>
-                    <div className="border-t border-zinc-700" />
-                    <button
-                      onClick={() => handleGraphExport("json")}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-700 transition-colors"
-                    >
-                      <FileJson className="w-3.5 h-3.5 text-yellow-400" />
-                      JSON data
-                    </button>
-                    <button
-                      onClick={() => handleGraphExport("markdown")}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-700 transition-colors"
-                    >
-                      <FileText className="w-3.5 h-3.5 text-purple-400" />
-                      Markdown
-                    </button>
-                  </div>
-                )}
-              </div>
-              <button
-                onClick={() => setShowManifest((v) => !v)}
-                className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-colors ${
-                  showManifest
-                    ? "bg-blue-700 text-white"
-                    : "bg-zinc-800 hover:bg-zinc-700 text-zinc-300"
-                }`}
-                title="Toggle rendered manifest preview"
-              >
-                <Layers className="w-3.5 h-3.5" />
-                Manifest
-              </button>
-            </>
-          )}
           <button
             onClick={() => setShowLoader((v) => !v)}
             className="flex items-center gap-1.5 text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-3 py-1.5 rounded-lg transition-colors"
@@ -429,18 +380,115 @@ export default function Home() {
             <LayoutGrid className="w-3.5 h-3.5" />
             {chartResult ? "Change Chart" : "Load Chart"}
           </button>
-          <a
-            href="https://github.com/unrealandychan/Helm-Visualizer"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-3 py-1.5 rounded-lg transition-colors"
-            title="View on GitHub"
-          >
-            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844a9.59 9.59 0 012.504.337c1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.02 10.02 0 0022 12.017C22 6.484 17.522 2 12 2z" />
-            </svg>
-            GitHub
-          </a>
+
+          {/* Burger menu */}
+          <div className="relative" ref={burgerMenuRef}>
+            <button
+              onClick={() => setShowBurgerMenu((v) => !v)}
+              className={`flex items-center justify-center w-8 h-8 rounded-lg transition-colors ${
+                showBurgerMenu
+                  ? "bg-zinc-700 text-white"
+                  : "bg-zinc-800 hover:bg-zinc-700 text-zinc-300"
+              }`}
+              aria-label="Open menu"
+              title="More options"
+            >
+              <Menu className="w-4 h-4" />
+            </button>
+
+            {showBurgerMenu && (
+              <div className="absolute right-0 top-full mt-1 w-56 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl z-50 overflow-hidden">
+                {/* Theme */}
+                <div className="px-3 py-2.5 flex items-center justify-between border-b border-zinc-700">
+                  <span className="text-xs text-zinc-400">Theme</span>
+                  <select
+                    value={theme}
+                    onChange={(e) => setTheme(e.target.value as ThemeId)}
+                    className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 rounded px-2 py-1 text-xs transition-colors"
+                    aria-label="Select color theme"
+                  >
+                    {THEMES.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {chartResult && (
+                  <>
+                    <button
+                      onClick={() => { exportYaml(); setShowBurgerMenu(false); }}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-700 transition-colors"
+                    >
+                      <Download className="w-3.5 h-3.5 text-blue-400" />
+                      Export YAML
+                    </button>
+                    <div className="border-t border-zinc-700" />
+                    <p className="px-3 pt-2 pb-1 text-[10px] text-zinc-500 uppercase tracking-wider">Export Graph</p>
+                    <button
+                      onClick={() => { handleGraphExport("png"); setShowBurgerMenu(false); }}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-700 transition-colors"
+                      disabled={!!exportingType}
+                    >
+                      <ImageIcon className="w-3.5 h-3.5 text-blue-400" />
+                      {exportingType === "png" ? "Exporting…" : "PNG image"}
+                    </button>
+                    <button
+                      onClick={() => { handleGraphExport("svg"); setShowBurgerMenu(false); }}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-700 transition-colors"
+                      disabled={!!exportingType}
+                    >
+                      <FileImage className="w-3.5 h-3.5 text-green-400" />
+                      {exportingType === "svg" ? "Exporting…" : "SVG image"}
+                    </button>
+                    <button
+                      onClick={() => { handleGraphExport("json"); setShowBurgerMenu(false); }}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-700 transition-colors"
+                      disabled={!!exportingType}
+                    >
+                      <FileJson className="w-3.5 h-3.5 text-yellow-400" />
+                      JSON data
+                    </button>
+                    <button
+                      onClick={() => { handleGraphExport("markdown"); setShowBurgerMenu(false); }}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-700 transition-colors"
+                      disabled={!!exportingType}
+                    >
+                      <FileText className="w-3.5 h-3.5 text-purple-400" />
+                      Markdown
+                    </button>
+                    <div className="border-t border-zinc-700" />
+                    <button
+                      onClick={() => { setShowManifest((v) => !v); setShowBurgerMenu(false); }}
+                      className={`w-full flex items-center gap-2 px-3 py-2 text-xs transition-colors ${
+                        showManifest
+                          ? "text-blue-400 bg-blue-950/40 hover:bg-blue-950/40"
+                          : "text-zinc-300 hover:bg-zinc-700"
+                      }`}
+                    >
+                      <Layers className="w-3.5 h-3.5" />
+                      {showManifest ? "Hide Manifest" : "Show Manifest"}
+                    </button>
+                    <div className="border-t border-zinc-700" />
+                  </>
+                )}
+
+                <a
+                  href="https://github.com/unrealandychan/Helm-Visualizer"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-700 transition-colors"
+                  title="View on GitHub"
+                >
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844a9.59 9.59 0 012.504.337c1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.02 10.02 0 0022 12.017C22 6.484 17.522 2 12 2z" />
+                  </svg>
+                  GitHub
+                </a>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
@@ -523,6 +571,7 @@ export default function Home() {
                 highlightedKeys={highlightedKeys}
                 onNodeSelect={setSelectedResource}
                 exportFilename={chartResult ? `${chartResult.chartMeta.name}-${activeEnv}-graph` : "helm-graph"}
+                theme={theme}
               />
             )
           )}
