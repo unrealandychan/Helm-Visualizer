@@ -183,13 +183,32 @@ function inferEdges(resources: K8sResource[]): Edge[] {
 
   // RoleBinding / ClusterRoleBinding → Role / ClusterRole (via roleRef)
   // RoleBinding / ClusterRoleBinding → ServiceAccount (via subjects[])
+  const resolveRoleRefTarget = (
+    rb: K8sResource,
+    refKind: string,
+    refName: string,
+  ): K8sResource | undefined => {
+    if (refKind === "Role") {
+      const rbNamespace = rb.metadata?.namespace;
+      return Array.from(resourcesByKindAndName.values()).find((resource) => {
+        return (
+          resource.kind === "Role" &&
+          resource.metadata?.name === refName &&
+          resource.metadata?.namespace === rbNamespace
+        );
+      });
+    }
+
+    return resourcesByKindAndName.get(`${refKind}/${refName}`);
+  };
+
   for (const rb of roleBindings) {
     const roleRef = (rb as Record<string, unknown>).roleRef as Record<string, unknown> | undefined;
     if (roleRef) {
       const refKind = roleRef.kind as string | undefined;
       const refName = roleRef.name as string | undefined;
       if (refKind && refName) {
-        const role = resourcesByKindAndName.get(`${refKind}/${refName}`);
+        const role = resolveRoleRefTarget(rb, refKind, refName);
         if (role) {
           addEdge(nodeId(rb), nodeId(role), "binds");
         }
