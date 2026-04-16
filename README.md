@@ -31,6 +31,7 @@ Paste an Artifact Hub URL, upload a `.tgz` chart, or load the chart from your ow
 | **Resource relationships** | Edges show how resources connect: `routes to`, `exposes`, `bound to`, `mounted by`, `referenced by` |
 | **Pure-JS renderer** | Go templates processed entirely in-browser when Helm CLI unavailable — no server-side helm binary |
 | **AI Chat Assistant** | Floating chatbot panel — ask natural-language questions about the loaded chart's resources, values, and configuration |
+| **AI Suggestions Panel** | Flags high-impact defaults/override gaps (image tag pinning, replicaCount, resources) with apply / ignore / explain actions |
 
 ---
 

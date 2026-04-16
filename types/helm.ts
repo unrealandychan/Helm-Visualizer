@@ -60,6 +60,16 @@ export interface ValidationResult {
   issues: ValidationIssue[];
 }
 
+export interface ChartSuggestion {
+  id: string;
+  env: string;
+  level: "high" | "medium";
+  title: string;
+  keyPath: string;
+  rationale: string;
+  recommendation?: unknown;
+}
+
 /** Data returned by any of the three API routes */
 export interface ChartRenderResult {
   chartMeta: HelmChartMeta;

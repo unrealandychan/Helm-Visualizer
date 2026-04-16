@@ -10,10 +10,12 @@ import { EnvSwitcher } from "@/components/EnvSwitcher";
 import { EnvDiffPanel } from "@/components/EnvDiffPanel";
 import { WelcomeScreen } from "@/components/WelcomeScreen";
 import { ChatBot } from "@/components/ChatBot";
+import { SuggestionsPanel } from "@/components/SuggestionsPanel";
 import { LayoutGrid, GitBranch, ChevronUp, ChevronDown, Download, AlertTriangle, Layers, FileImage, FileJson, FileText, Image as ImageIcon, X, Menu } from "lucide-react";
 import yaml from "js-yaml";
 import type {
   ChartRenderResult,
+  ChartSuggestion,
   EnvRenderResult,
   ResourceNodeData,
   ResourceGraphNode,
@@ -23,9 +25,11 @@ import type { GraphData } from "@/types/helm";
 import { computeValuesDiff } from "@/lib/valueDiff";
 import { exportGraphAsJson, exportGraphAsMarkdown, triggerDownload } from "@/lib/graphExport";
 import type { ResourceGraphHandle } from "@/components/ResourceGraph";
+import { analyzeChartSuggestions, applySuggestionToEnv } from "@/lib/chartSuggestions";
 
 const HISTORY_KEY = "helm-viz-history";
 const MAX_HISTORY = 8;
+const MAX_VALUES_TREE_ENTRIES_FOR_LLM = 200;
 const THEME_KEY = "helm-viz-theme";
 const THEMES = [
   { id: "dark", label: "Dark" },
@@ -117,6 +121,9 @@ export default function Home() {
   const [selectedValueKey, setSelectedValueKey] = useState<string | null>(null);
   const [exportingType, setExportingType] = useState<string | null>(null);
   const [validationDismissed, setValidationDismissed] = useState(false);
+  const [ignoredSuggestionIds, setIgnoredSuggestionIds] = useState<Set<string>>(new Set());
+  const [llmExplanations, setLlmExplanations] = useState<Record<string, string>>({});
+  const [explainingSuggestionId, setExplainingSuggestionId] = useState<string | null>(null);
   const [theme, setTheme] = useState<ThemeId>("dark");
   const [showBurgerMenu, setShowBurgerMenu] = useState(false);
   const graphRef = useRef<ResourceGraphHandle>(null);
@@ -169,6 +176,9 @@ export default function Home() {
     setSelectedResource(null);
     setShowLoader(false);
     setValidationDismissed(false);
+    setIgnoredSuggestionIds(new Set());
+    setLlmExplanations({});
+    setExplainingSuggestionId(null);
 
     const entry: HistoryEntry = {
       id: crypto.randomUUID(),
@@ -242,6 +252,10 @@ export default function Home() {
     [currentGraph?.nodes, diffGraph?.nodes, diffResult?.changedKeys]
   );
   const kindCounts = getKindCounts(chartResult, activeEnv);
+  const chartSuggestions = useMemo(
+    () => analyzeChartSuggestions(chartResult),
+    [chartResult]
+  );
 
   // The set of nodes/edges actually shown in the graph (respects diff overlay)
   const visibleNodes = useMemo(
@@ -249,6 +263,82 @@ export default function Home() {
     [diffNodes, currentGraph?.nodes]
   );
   const visibleEdges = currentGraph?.edges ?? [];
+
+  function handleIgnoreSuggestion(suggestion: ChartSuggestion) {
+    setIgnoredSuggestionIds((prev) => new Set(prev).add(suggestion.id));
+  }
+
+  function handleApplySuggestion(suggestion: ChartSuggestion) {
+    if (suggestion.recommendation === undefined) return;
+    setChartResult((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        environments: prev.environments.map((env) => applySuggestionToEnv(env, suggestion)),
+      };
+    });
+    handleIgnoreSuggestion(suggestion);
+  }
+
+  async function handleExplainSuggestion(suggestion: ChartSuggestion) {
+    if (!chartResult || llmExplanations[suggestion.id]) return;
+    setExplainingSuggestionId(suggestion.id);
+    try {
+      const minimalContext = {
+        chartMeta: chartResult.chartMeta,
+        environments: chartResult.environments.map((env) => ({
+          env: env.env,
+          renderError: env.renderError,
+          resources: env.resources.map((r) => ({
+            apiVersion: r.apiVersion,
+            kind: r.kind,
+            metadata: { name: r.metadata?.name, namespace: r.metadata?.namespace },
+          })),
+          // Keep this bounded so explain requests stay responsive and within LLM payload limits.
+          valuesTree: { entries: env.valuesTree.entries.slice(0, MAX_VALUES_TREE_ENTRIES_FOR_LLM) },
+        })),
+      };
+
+      const prompt =
+        `Explain this Helm chart suggestion briefly and concretely.\n` +
+        `Title: ${suggestion.title}\n` +
+        `Environment: ${suggestion.env}\n` +
+        `Key: ${suggestion.keyPath}\n` +
+        `Rationale: ${suggestion.rationale}\n` +
+        `Recommended value: ${JSON.stringify(suggestion.recommendation)}\n` +
+        `Include risk if not applied and one practical rollout tip.`;
+
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [{ role: "user", content: prompt }],
+          chartContext: minimalContext,
+          activeEnv,
+        }),
+      });
+
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+        setLlmExplanations((prev) => ({
+          ...prev,
+          [suggestion.id]: `Failed to generate explanation: ${json.error ?? `HTTP ${res.status}`}`,
+        }));
+        return;
+      }
+
+      const streamingResponseBody = await res.text();
+      const explanation = extractStreamingText(streamingResponseBody).trim() || "No additional AI explanation returned.";
+      setLlmExplanations((prev) => ({ ...prev, [suggestion.id]: explanation }));
+    } catch (err) {
+      setLlmExplanations((prev) => ({
+        ...prev,
+        [suggestion.id]: `Could not get AI explanation: ${err instanceof Error ? err.message : String(err)}`,
+      }));
+    } finally {
+      setExplainingSuggestionId(null);
+    }
+  }
 
   return (
     <div className="flex flex-col h-screen bg-zinc-950 text-white overflow-hidden">
@@ -507,6 +597,18 @@ export default function Home() {
             />
           </div>
         )}
+
+        {chartResult && !showManifest && !selectedResource && (
+          <SuggestionsPanel
+            suggestions={chartSuggestions}
+            ignoredIds={ignoredSuggestionIds}
+            explainingId={explainingSuggestionId}
+            llmExplanations={llmExplanations}
+            onApply={handleApplySuggestion}
+            onIgnore={handleIgnoreSuggestion}
+            onExplain={handleExplainSuggestion}
+          />
+        )}
       </div>
 
       <ChatBot chartContext={chartResult} activeEnv={activeEnv} />
@@ -543,6 +645,22 @@ export default function Home() {
       )}
     </div>
   );
+}
+
+function extractStreamingText(sseBody: string): string {
+  let out = "";
+  for (const line of sseBody.split("\n")) {
+    if (!line.startsWith("data: ")) continue;
+    const payload = line.slice(6).trim();
+    if (!payload || payload === "[DONE]") continue;
+    try {
+      const parsed = JSON.parse(payload);
+      out += parsed.choices?.[0]?.delta?.content ?? "";
+    } catch {
+      // ignore malformed chunks
+    }
+  }
+  return out;
 }
 
 function computeDiffNodes(
