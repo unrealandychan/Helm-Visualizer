@@ -26,6 +26,10 @@ const KNOWN_KINDS: Set<string> = new Set([
   "DaemonSet",
   "Job",
   "PersistentVolumeClaim",
+  "ClusterRole",
+  "ClusterRoleBinding",
+  "Role",
+  "RoleBinding",
 ]);
 
 function classifyKind(kind: string): K8sKind {
@@ -56,6 +60,9 @@ function inferEdges(resources: K8sResource[]): Edge[] {
   const cronJobs = resources.filter((r) => r.kind === "CronJob");
   const configMaps = resources.filter((r) => r.kind === "ConfigMap");
   const secrets = resources.filter((r) => r.kind === "Secret");
+  const roleBindings = resources.filter(
+    (r) => r.kind === "RoleBinding" || r.kind === "ClusterRoleBinding"
+  );
 
   // O(1) name-based lookup maps — avoids O(n) Array.find() inside loops
   const servicesByName = new Map(services.map((s) => [s.metadata.name, s]));
@@ -170,6 +177,39 @@ function inferEdges(resources: K8sResource[]): Edge[] {
       const sa = serviceAccountsByName.get(saName);
       if (sa) {
         addEdge(nodeId(sa), nodeId(workload), "bound to");
+      }
+    }
+  }
+
+  // RoleBinding / ClusterRoleBinding → Role / ClusterRole (via roleRef)
+  // RoleBinding / ClusterRoleBinding → ServiceAccount (via subjects[])
+  for (const rb of roleBindings) {
+    const roleRef = (rb as Record<string, unknown>).roleRef as Record<string, unknown> | undefined;
+    if (roleRef) {
+      const refKind = roleRef.kind as string | undefined;
+      const refName = roleRef.name as string | undefined;
+      if (refKind && refName) {
+        const role = resourcesByKindAndName.get(`${refKind}/${refName}`);
+        if (role) {
+          addEdge(nodeId(rb), nodeId(role), "binds");
+        }
+      }
+    }
+
+    const subjects = (rb as Record<string, unknown>).subjects as
+      | Array<Record<string, unknown>>
+      | undefined;
+    if (subjects) {
+      for (const subject of subjects) {
+        if (subject.kind === "ServiceAccount") {
+          const saName = subject.name as string | undefined;
+          if (saName) {
+            const sa = serviceAccountsByName.get(saName);
+            if (sa) {
+              addEdge(nodeId(rb), nodeId(sa), "grants");
+            }
+          }
+        }
       }
     }
   }
