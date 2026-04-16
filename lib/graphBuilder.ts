@@ -69,6 +69,10 @@ function inferEdges(resources: K8sResource[]): Edge[] {
   const configMapsByName = new Map(configMaps.map((c) => [c.metadata.name, c]));
   const secretsByName = new Map(secrets.map((s) => [s.metadata.name, s]));
   const serviceAccountsByName = new Map(serviceAccounts.map((sa) => [sa.metadata.name, sa]));
+  // Namespace-aware SA lookup for RBAC subject resolution (namespace/name)
+  const serviceAccountsByNsAndName = new Map(
+    serviceAccounts.map((sa) => [`${sa.metadata?.namespace ?? ""}/${sa.metadata.name}`, sa])
+  );
   // For HPA scaleTargetRef we need lookup by "kind/name"
   const resourcesByKindAndName = new Map(
     resources.map((r) => [`${r.kind}/${r.metadata.name}`, r])
@@ -210,7 +214,7 @@ function inferEdges(resources: K8sResource[]): Edge[] {
       if (refKind && refName) {
         const role = resolveRoleRefTarget(rb, refKind, refName);
         if (role) {
-          addEdge(nodeId(rb), nodeId(role), "binds");
+          addEdge(nodeId(role), nodeId(rb), "binds");
         }
       }
     }
@@ -223,7 +227,13 @@ function inferEdges(resources: K8sResource[]): Edge[] {
         if (subject.kind === "ServiceAccount") {
           const saName = subject.name as string | undefined;
           if (saName) {
-            const sa = serviceAccountsByName.get(saName);
+            // Resolve SA namespace: use explicit subject.namespace, then fall back
+            // to the binding's own namespace (applies to RoleBinding subjects that
+            // default to the binding namespace per the Kubernetes spec)
+            const saNs = (subject.namespace as string | undefined) ?? rb.metadata?.namespace ?? "";
+            const sa =
+              serviceAccountsByNsAndName.get(`${saNs}/${saName}`) ??
+              serviceAccountsByName.get(saName);
             if (sa) {
               addEdge(nodeId(rb), nodeId(sa), "grants");
             }
