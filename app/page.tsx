@@ -272,7 +272,7 @@ export default function Home() {
   // Apply kind filter on top of visible nodes/edges
   const filteredNodes = useMemo(() => {
     if (activeKindFilters.size === 0) return visibleNodes;
-    return visibleNodes.filter((n) => activeKindFilters.has(n.data.kind as string));
+    return visibleNodes.filter((n) => activeKindFilters.has(n.data.kind));
   }, [visibleNodes, activeKindFilters]);
 
   const filteredEdges = useMemo(() => {
@@ -375,6 +375,9 @@ export default function Home() {
                   const isActive = activeKindFilters.has(kind);
                   const colorClass = KIND_BADGE_COLOR[kind as K8sKind] ?? "bg-zinc-800 text-zinc-300 border-zinc-600";
                   const label = KIND_LABEL[kind as K8sKind] ?? kind;
+                  const activeClass = isActive
+                    ? "ring-2 ring-white/60 brightness-125"
+                    : "opacity-80 hover:opacity-100 hover:brightness-110";
                   return (
                     <button
                       key={kind}
@@ -390,11 +393,7 @@ export default function Home() {
                           return next;
                         });
                       }}
-                      className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-offset-zinc-900 focus:ring-white/40 ${colorClass} ${
-                        isActive
-                          ? "ring-2 ring-white/60 brightness-125"
-                          : "opacity-80 hover:opacity-100 hover:brightness-110"
-                      }`}
+                      className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-offset-zinc-900 focus:ring-white/40 ${colorClass} ${activeClass}`}
                       title={isActive ? `Remove ${kind} filter` : `Filter by ${kind}`}
                       aria-pressed={isActive}
                       aria-label={`${label} ${count}${isActive ? " (active filter)" : ""}`}
