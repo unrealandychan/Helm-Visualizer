@@ -126,6 +126,7 @@ export default function Home() {
   const [explainingSuggestionId, setExplainingSuggestionId] = useState<string | null>(null);
   const [theme, setTheme] = useState<ThemeId>("dark");
   const [showBurgerMenu, setShowBurgerMenu] = useState(false);
+  const [activeKindFilters, setActiveKindFilters] = useState<Set<string>>(new Set());
   const graphRef = useRef<ResourceGraphHandle>(null);
   const burgerMenuRef = useRef<HTMLDivElement>(null);
 
@@ -179,6 +180,7 @@ export default function Home() {
     setIgnoredSuggestionIds(new Set());
     setLlmExplanations({});
     setExplainingSuggestionId(null);
+    setActiveKindFilters(new Set());
 
     const entry: HistoryEntry = {
       id: crypto.randomUUID(),
@@ -220,12 +222,12 @@ export default function Home() {
       } else if (type === "svg") {
         await graphRef.current?.exportSvg();
       } else if (type === "json") {
-        const content = exportGraphAsJson(visibleNodes, visibleEdges, chartResult.chartMeta, activeEnv);
+        const content = exportGraphAsJson(filteredNodes, filteredEdges, chartResult.chartMeta, activeEnv);
         triggerDownload(content, `${basename}.json`, "application/json");
       } else if (type === "markdown") {
         const content = exportGraphAsMarkdown(
-          visibleNodes,
-          visibleEdges,
+          filteredNodes,
+          filteredEdges,
           chartResult.chartMeta,
           activeEnv,
           highlightedKeys
@@ -262,7 +264,22 @@ export default function Home() {
     () => diffNodes.length > 0 ? diffNodes : (currentGraph?.nodes ?? []),
     [diffNodes, currentGraph?.nodes]
   );
-  const visibleEdges = currentGraph?.edges ?? [];
+  const visibleEdges = useMemo(
+    () => currentGraph?.edges ?? [],
+    [currentGraph?.edges]
+  );
+
+  // Apply kind filter on top of visible nodes/edges
+  const filteredNodes = useMemo(() => {
+    if (activeKindFilters.size === 0) return visibleNodes;
+    return visibleNodes.filter((n) => activeKindFilters.has(n.data.kind));
+  }, [visibleNodes, activeKindFilters]);
+
+  const filteredEdges = useMemo(() => {
+    if (activeKindFilters.size === 0) return visibleEdges;
+    const visibleIds = new Set(filteredNodes.map((n) => n.id));
+    return visibleEdges.filter((e) => visibleIds.has(e.source) && visibleIds.has(e.target));
+  }, [visibleEdges, filteredNodes, activeKindFilters]);
 
   function handleIgnoreSuggestion(suggestion: ChartSuggestion) {
     setIgnoredSuggestionIds((prev) => new Set(prev).add(suggestion.id));
@@ -355,19 +372,49 @@ export default function Home() {
               {/* Kind count badges */}
               <div className="hidden lg:flex items-center gap-1 ml-2 overflow-hidden">
                 {Object.entries(kindCounts).map(([kind, count]) => {
+                  const isActive = activeKindFilters.has(kind);
                   const colorClass = KIND_BADGE_COLOR[kind as K8sKind] ?? "bg-zinc-800 text-zinc-300 border-zinc-600";
                   const label = KIND_LABEL[kind as K8sKind] ?? kind;
+                  const activeClass = isActive
+                    ? "ring-2 ring-white/60 brightness-125"
+                    : "opacity-80 hover:opacity-100 hover:brightness-110";
                   return (
-                    <span
+                    <button
                       key={kind}
-                      className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border ${colorClass}`}
-                      title={kind}
+                      type="button"
+                      onClick={() => {
+                        setActiveKindFilters((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(kind)) {
+                            next.delete(kind);
+                          } else {
+                            next.add(kind);
+                          }
+                          return next;
+                        });
+                      }}
+                      className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-offset-zinc-900 focus:ring-white/40 ${colorClass} ${activeClass}`}
+                      title={isActive ? `Remove ${kind} filter` : `Filter by ${kind}`}
+                      aria-pressed={isActive}
+                      aria-label={`${label} ${count}${isActive ? " (active filter)" : ""}`}
                     >
                       {label}
                       <span className="opacity-70">{count}</span>
-                    </span>
+                    </button>
                   );
                 })}
+                {activeKindFilters.size > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveKindFilters(new Set())}
+                    className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium border border-zinc-600 bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-offset-zinc-900 focus:ring-white/40"
+                    title="Clear all kind filters"
+                    aria-label="Clear all kind filters"
+                  >
+                    <X className="w-2.5 h-2.5" />
+                    All
+                  </button>
+                )}
               </div>
             </>
           )}
@@ -566,8 +613,8 @@ export default function Home() {
             currentGraph && (
               <ResourceGraph
                 ref={graphRef}
-                nodes={visibleNodes}
-                edges={visibleEdges}
+                nodes={filteredNodes}
+                edges={filteredEdges}
                 highlightedKeys={highlightedKeys}
                 onNodeSelect={setSelectedResource}
                 exportFilename={chartResult ? `${chartResult.chartMeta.name}-${activeEnv}-graph` : "helm-graph"}
