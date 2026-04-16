@@ -22,6 +22,10 @@ const KIND_CONFIG: Record<
   ConfigMap:                { bg: "bg-teal-950",   border: "border-teal-500",   text: "text-teal-300",   iconChar: "⚙", label: "ConfigMap" },
   Secret:                   { bg: "bg-red-950",    border: "border-red-700",    text: "text-red-300",    iconChar: "🔑", label: "Secret" },
   PersistentVolumeClaim:    { bg: "bg-indigo-950", border: "border-indigo-500", text: "text-indigo-300", iconChar: "💾", label: "PVC" },
+  ClusterRole:              { bg: "bg-pink-950",   border: "border-pink-600",   text: "text-pink-300",   iconChar: "🛡", label: "ClusterRole" },
+  ClusterRoleBinding:       { bg: "bg-pink-900",   border: "border-pink-500",   text: "text-pink-200",   iconChar: "🔗", label: "CRB" },
+  Role:                     { bg: "bg-fuchsia-950", border: "border-fuchsia-600", text: "text-fuchsia-300", iconChar: "🛡", label: "Role" },
+  RoleBinding:              { bg: "bg-fuchsia-900", border: "border-fuchsia-500", text: "text-fuchsia-200", iconChar: "🔗", label: "RoleBinding" },
   Unknown:                  { bg: "bg-zinc-800",   border: "border-zinc-500",   text: "text-zinc-300",   iconChar: "?", label: "Resource" },
 };
 
