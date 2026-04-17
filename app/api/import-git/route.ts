@@ -44,7 +44,10 @@ export async function POST(request: Request) {
   const tmpDir = path.join("/tmp", `helm-git-${randomUUID()}`);
 
   try {
-    const body = (await request.json()) as { url?: string };
+    const rawBody: unknown = await request.json();
+    const body = rawBody !== null && typeof rawBody === "object" && !Array.isArray(rawBody)
+      ? (rawBody as { url?: string })
+      : ({} as { url?: string });
 
     if (!body.url?.trim()) {
       return NextResponse.json(

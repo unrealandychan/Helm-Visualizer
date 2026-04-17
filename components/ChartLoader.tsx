@@ -503,7 +503,7 @@ export function ChartLoader({ onLoad, history = [] }: ChartLoaderProps) {
             <p className="text-zinc-600 text-[11px] mt-1.5">
               Supports{" "}
               <code className="bg-zinc-800 px-1 rounded">https://github.com/owner/repo/tree/main/charts/myapp</code>
-              . Public repos only. Results are cached for 24 h.
+              . Public repos only. Results are cached for 24h.
             </p>
           </div>
 
