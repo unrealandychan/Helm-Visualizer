@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import React from "react";
 import { MessageCircle, X, Send, Bot, User, Loader2, AlertCircle, Copy, Check } from "lucide-react";
 import clsx from "clsx";
 import ReactMarkdown from "react-markdown";
@@ -286,16 +287,17 @@ export function ChatBot({ chartContext, activeEnv }: ChatBotProps) {
 }
 
 function CodeBlock({ className, children }: { className?: string; children?: React.ReactNode }) {
-  const [copied, setCopied] = useState(false);
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
   const codeRef = useRef<HTMLElement>(null);
 
   function handleCopy() {
     const text = codeRef.current?.textContent ?? "";
     navigator.clipboard.writeText(text).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setCopyState("copied");
+      setTimeout(() => setCopyState("idle"), 2000);
     }).catch(() => {
-      // Clipboard write failed (e.g. permissions denied); silently ignore
+      setCopyState("error");
+      setTimeout(() => setCopyState("idle"), 2000);
     });
   }
 
@@ -307,11 +309,13 @@ function CodeBlock({ className, children }: { className?: string; children?: Rea
       <button
         onClick={handleCopy}
         className="absolute top-2 right-2 flex items-center gap-1 px-1.5 py-1 rounded bg-zinc-700 hover:bg-zinc-600 text-zinc-300 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"
-        title="Copy code"
+        title={copyState === "error" ? "Copy failed" : "Copy code"}
         type="button"
       >
-        {copied ? (
+        {copyState === "copied" ? (
           <Check className="w-3 h-3 text-green-400" />
+        ) : copyState === "error" ? (
+          <X className="w-3 h-3 text-red-400" />
         ) : (
           <Copy className="w-3 h-3" />
         )}
@@ -327,8 +331,8 @@ interface CodeElementProps {
 
 function extractCodeProps(children: React.ReactNode): CodeElementProps | null {
   const codeEl = Array.isArray(children) ? children[0] : children;
-  if (codeEl && typeof codeEl === "object" && "props" in codeEl) {
-    const { className, children: codeChildren } = (codeEl as React.ReactElement<CodeElementProps>).props;
+  if (React.isValidElement<CodeElementProps>(codeEl)) {
+    const { className, children: codeChildren } = codeEl.props;
     return { className, children: codeChildren };
   }
   return null;
