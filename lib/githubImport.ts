@@ -36,6 +36,9 @@ export function parseGitHubUrl(rawUrl: string): GitHubUrlInfo {
     throw new Error("Invalid URL.");
   }
 
+  if (parsed.protocol !== "https:") {
+    throw new Error("Only https://github.com URLs are supported for Git import.");
+  }
   if (parsed.hostname !== "github.com") {
     throw new Error("Only github.com URLs are supported for Git import.");
   }
