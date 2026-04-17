@@ -490,7 +490,11 @@ export function ChartLoader({ onLoad, history = [] }: ChartLoaderProps) {
                 value={gitUrl}
                 onChange={(e) => setGitUrl(e.target.value)}
                 className="flex-1 bg-zinc-800 border border-zinc-600 rounded-lg text-sm text-white px-3 py-2 outline-none focus:border-blue-500 placeholder-zinc-500"
-                onKeyDown={(e) => e.key === "Enter" && loadFromGitHub()}
+                onKeyDown={(e) => {
+                  if (e.key !== "Enter" || loading) return;
+                  e.preventDefault();
+                  loadFromGitHub();
+                }}
               />
               <button
                 onClick={loadFromGitHub}
