@@ -424,6 +424,25 @@ const markdownComponents: Components = {
 
 function ChatMessage({ message }: { message: Message }) {
   const isUser = message.role === "user";
+  const shouldRenderMarkdown = !isUser && !message.error;
+  const [debouncedContent, setDebouncedContent] = useState(message.content);
+  const [isContentSettling, setIsContentSettling] = useState(false);
+
+  useEffect(() => {
+    if (!shouldRenderMarkdown) {
+      setDebouncedContent(message.content);
+      setIsContentSettling(false);
+      return;
+    }
+
+    setIsContentSettling(true);
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedContent(message.content);
+      setIsContentSettling(false);
+    }, 120);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [message.content, shouldRenderMarkdown]);
 
   return (
     <div className={clsx("flex gap-2", isUser ? "justify-end" : "justify-start")}>
@@ -448,18 +467,20 @@ function ChatMessage({ message }: { message: Message }) {
       >
         {isUser || message.error ? (
           message.content || <span className="opacity-0 select-none">​</span>
-        ) : (
-          message.content ? (
+        ) : message.content ? (
+          isContentSettling ? (
+            <span className="whitespace-pre-wrap">{message.content}</span>
+          ) : (
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               rehypePlugins={[rehypeHighlight]}
               components={markdownComponents}
             >
-              {message.content}
+              {debouncedContent}
             </ReactMarkdown>
-          ) : (
-            <span className="opacity-0 select-none">​</span>
           )
+        ) : (
+          <span className="opacity-0 select-none">​</span>
         )}
       </div>
       {isUser && (
