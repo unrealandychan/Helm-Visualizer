@@ -1,8 +1,13 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { MessageCircle, X, Send, Bot, User, Loader2, AlertCircle } from "lucide-react";
+import React from "react";
+import { MessageCircle, X, Send, Bot, User, Loader2, AlertCircle, Copy, Check } from "lucide-react";
 import clsx from "clsx";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import rehypeHighlight from "rehype-highlight";
+import type { Components } from "react-markdown";
 import type { ChartRenderResult } from "@/types/helm";
 
 interface Message {
@@ -281,8 +286,164 @@ export function ChatBot({ chartContext, activeEnv }: ChatBotProps) {
   );
 }
 
+function CodeBlock({ className, children }: { className?: string; children?: React.ReactNode }) {
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
+  const codeRef = useRef<HTMLElement>(null);
+  const copyResetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function resetCopyStateLater() {
+    if (copyResetTimeoutRef.current) {
+      clearTimeout(copyResetTimeoutRef.current);
+    }
+
+    copyResetTimeoutRef.current = setTimeout(() => {
+      setCopyState("idle");
+      copyResetTimeoutRef.current = null;
+    }, 2000);
+  }
+
+  useEffect(() => {
+    return () => {
+      if (copyResetTimeoutRef.current) {
+        clearTimeout(copyResetTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  function handleCopy() {
+    const text = codeRef.current?.textContent ?? "";
+    navigator.clipboard.writeText(text).then(() => {
+      setCopyState("copied");
+      resetCopyStateLater();
+    }).catch(() => {
+      setCopyState("error");
+      resetCopyStateLater();
+    });
+  }
+
+  return (
+    <div className="relative group my-2">
+      <pre className="rounded-lg bg-zinc-950 overflow-x-auto text-xs leading-relaxed">
+        <code ref={codeRef} className={className}>{children}</code>
+      </pre>
+      <button
+        onClick={handleCopy}
+        className="absolute top-2 right-2 flex items-center gap-1 px-1.5 py-1 rounded bg-zinc-700 hover:bg-zinc-600 text-zinc-300 text-[10px] opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus:opacity-100 transition-opacity"
+        title={copyState === "error" ? "Copy failed" : "Copy code"}
+        aria-label={copyState === "error" ? "Copy failed" : "Copy code"}
+        type="button"
+      >
+        {copyState === "copied" ? (
+          <Check className="w-3 h-3 text-green-400" />
+        ) : copyState === "error" ? (
+          <X className="w-3 h-3 text-red-400" />
+        ) : (
+          <Copy className="w-3 h-3" />
+        )}
+      </button>
+    </div>
+  );
+}
+
+interface CodeElementProps {
+  className?: string;
+  children?: React.ReactNode;
+}
+
+function extractCodeProps(children: React.ReactNode): CodeElementProps | null {
+  const codeEl = React.Children.toArray(children).find((child) => (
+    React.isValidElement<CodeElementProps>(child) && child.type === "code"
+  ));
+
+  if (React.isValidElement<CodeElementProps>(codeEl)) {
+    const { className, children: codeChildren } = codeEl.props;
+    return { className, children: codeChildren };
+  }
+
+  return null;
+}
+
+const markdownComponents: Components = {
+  pre({ children }) {
+    const codeProps = extractCodeProps(children);
+    if (codeProps) {
+      return <CodeBlock className={codeProps.className}>{codeProps.children}</CodeBlock>;
+    }
+    return (
+      <div className="relative group my-2">
+        <pre className="rounded-lg bg-zinc-950 overflow-x-auto text-xs leading-relaxed">{children}</pre>
+      </div>
+    );
+  },
+  code({ className, children, ...props }) {
+    // Inline code (no language class means it's not inside a fenced block handled by pre)
+    const isInline = !className;
+    if (isInline) {
+      return (
+        <code
+          className="bg-zinc-700 text-zinc-200 px-1 py-0.5 rounded text-[11px] font-mono"
+          {...props}
+        >
+          {children}
+        </code>
+      );
+    }
+    return (
+      <code className={className} {...props}>
+        {children}
+      </code>
+    );
+  },
+  p({ children }) {
+    return <p className="mb-1 last:mb-0">{children}</p>;
+  },
+  ul({ children }) {
+    return <ul className="list-disc pl-4 mb-1 space-y-0.5">{children}</ul>;
+  },
+  ol({ children }) {
+    return <ol className="list-decimal pl-4 mb-1 space-y-0.5">{children}</ol>;
+  },
+  li({ children }) {
+    return <li>{children}</li>;
+  },
+  strong({ children }) {
+    return <strong className="font-semibold">{children}</strong>;
+  },
+  a({ href, children }) {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-blue-400 underline hover:text-blue-300"
+      >
+        {children}
+      </a>
+    );
+  },
+};
+
 function ChatMessage({ message }: { message: Message }) {
   const isUser = message.role === "user";
+  const shouldRenderMarkdown = !isUser && !message.error;
+  const [debouncedContent, setDebouncedContent] = useState(message.content);
+  const [isContentSettling, setIsContentSettling] = useState(false);
+
+  useEffect(() => {
+    if (!shouldRenderMarkdown) {
+      setDebouncedContent(message.content);
+      setIsContentSettling(false);
+      return;
+    }
+
+    setIsContentSettling(true);
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedContent(message.content);
+      setIsContentSettling(false);
+    }, 120);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [message.content, shouldRenderMarkdown]);
 
   return (
     <div className={clsx("flex gap-2", isUser ? "justify-end" : "justify-start")}>
@@ -297,15 +458,29 @@ function ChatMessage({ message }: { message: Message }) {
       )}
       <div
         className={clsx(
-          "max-w-[80%] rounded-2xl px-3 py-2 text-xs leading-relaxed whitespace-pre-wrap break-words",
+          "max-w-[80%] rounded-2xl px-3 py-2 text-xs leading-relaxed break-words",
           isUser
-            ? "bg-blue-600 text-white rounded-br-sm"
+            ? "bg-blue-600 text-white rounded-br-sm whitespace-pre-wrap"
             : message.error
-            ? "bg-red-950/60 border border-red-800/50 text-red-300 rounded-bl-sm"
+            ? "bg-red-950/60 border border-red-800/50 text-red-300 rounded-bl-sm whitespace-pre-wrap"
             : "bg-zinc-800 text-zinc-200 rounded-bl-sm"
         )}
       >
-        {message.content || (
+        {isUser || message.error ? (
+          message.content || <span className="opacity-0 select-none">​</span>
+        ) : message.content ? (
+          isContentSettling ? (
+            <span className="whitespace-pre-wrap">{message.content}</span>
+          ) : (
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              rehypePlugins={[rehypeHighlight]}
+              components={markdownComponents}
+            >
+              {debouncedContent}
+            </ReactMarkdown>
+          )
+        ) : (
           <span className="opacity-0 select-none">​</span>
         )}
       </div>
