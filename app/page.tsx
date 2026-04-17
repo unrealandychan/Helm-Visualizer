@@ -42,7 +42,7 @@ export interface HistoryEntry {
   id: string;
   name: string;
   version: string;
-  source: "workspace" | "upload" | "artifacthub";
+  source: "workspace" | "upload" | "artifacthub" | "github";
   url?: string;
   loadedAt: string;
   result: ChartRenderResult;
@@ -170,7 +170,7 @@ export default function Home() {
     localStorage.setItem(THEME_KEY, theme);
   }, [theme]);
 
-  const handleChartLoad = useCallback((result: ChartRenderResult, source: "workspace" | "upload" | "artifacthub" = "workspace", url?: string) => {
+  const handleChartLoad = useCallback((result: ChartRenderResult, source: "workspace" | "upload" | "artifacthub" | "github" = "workspace", url?: string) => {
     setChartResult(result);
     setActiveEnv(result.activeEnv);
     setDiffEnv(null);
