@@ -12,12 +12,16 @@
     "@dagrejs/dagre": "^3.0.0",
     "@xyflow/react": "^12.10.2",
     "clsx": "^2.1.1",
+    "highlight.js": "^11.11.1",
     "html-to-image": "^1.11.13",
     "js-yaml": "^4.1.1",
     "lucide-react": "^1.7.0",
     "next": "16.2.2",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "react-markdown": "^10.1.0",
+    "rehype-highlight": "^7.0.2",
+    "remark-gfm": "^4.0.1",
     "tar": "^7.5.13"
   },
   "devDependencies": {
