@@ -350,11 +350,15 @@ interface CodeElementProps {
 }
 
 function extractCodeProps(children: React.ReactNode): CodeElementProps | null {
-  const codeEl = Array.isArray(children) ? children[0] : children;
+  const codeEl = React.Children.toArray(children).find((child) => (
+    React.isValidElement<CodeElementProps>(child) && child.type === "code"
+  ));
+
   if (React.isValidElement<CodeElementProps>(codeEl)) {
     const { className, children: codeChildren } = codeEl.props;
     return { className, children: codeChildren };
   }
+
   return null;
 }
 
