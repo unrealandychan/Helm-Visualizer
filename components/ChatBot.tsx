@@ -294,6 +294,8 @@ function CodeBlock({ className, children }: { className?: string; children?: Rea
     navigator.clipboard.writeText(text).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    }).catch(() => {
+      // Clipboard write failed (e.g. permissions denied); silently ignore
     });
   }
 
@@ -318,17 +320,25 @@ function CodeBlock({ className, children }: { className?: string; children?: Rea
   );
 }
 
+interface CodeElementProps {
+  className?: string;
+  children?: React.ReactNode;
+}
+
+function extractCodeProps(children: React.ReactNode): CodeElementProps | null {
+  const codeEl = Array.isArray(children) ? children[0] : children;
+  if (codeEl && typeof codeEl === "object" && "props" in codeEl) {
+    const { className, children: codeChildren } = (codeEl as React.ReactElement<CodeElementProps>).props;
+    return { className, children: codeChildren };
+  }
+  return null;
+}
+
 const markdownComponents: Components = {
   pre({ children }) {
-    // Extract the code element's children and className from the pre's children
-    const codeEl = Array.isArray(children) ? children[0] : children;
-    if (
-      codeEl &&
-      typeof codeEl === "object" &&
-      "props" in codeEl
-    ) {
-      const { className, children: codeChildren } = (codeEl as React.ReactElement<{ className?: string; children?: React.ReactNode }>).props;
-      return <CodeBlock className={className}>{codeChildren}</CodeBlock>;
+    const codeProps = extractCodeProps(children);
+    if (codeProps) {
+      return <CodeBlock className={codeProps.className}>{codeProps.children}</CodeBlock>;
     }
     return (
       <div className="relative group my-2">
