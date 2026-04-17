@@ -289,15 +289,35 @@ export function ChatBot({ chartContext, activeEnv }: ChatBotProps) {
 function CodeBlock({ className, children }: { className?: string; children?: React.ReactNode }) {
   const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
   const codeRef = useRef<HTMLElement>(null);
+  const copyResetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function resetCopyStateLater() {
+    if (copyResetTimeoutRef.current) {
+      clearTimeout(copyResetTimeoutRef.current);
+    }
+
+    copyResetTimeoutRef.current = setTimeout(() => {
+      setCopyState("idle");
+      copyResetTimeoutRef.current = null;
+    }, 2000);
+  }
+
+  useEffect(() => {
+    return () => {
+      if (copyResetTimeoutRef.current) {
+        clearTimeout(copyResetTimeoutRef.current);
+      }
+    };
+  }, []);
 
   function handleCopy() {
     const text = codeRef.current?.textContent ?? "";
     navigator.clipboard.writeText(text).then(() => {
       setCopyState("copied");
-      setTimeout(() => setCopyState("idle"), 2000);
+      resetCopyStateLater();
     }).catch(() => {
       setCopyState("error");
-      setTimeout(() => setCopyState("idle"), 2000);
+      resetCopyStateLater();
     });
   }
 
