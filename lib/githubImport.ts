@@ -163,10 +163,8 @@ async function listContents(
   }
 
   if (res.status === 403 || res.status === 401) {
-    const body = await res.json().catch(() => ({}) as Record<string, string>);
-    const msg = typeof body === "object" && body !== null && "message" in body
-      ? String((body as Record<string, string>).message)
-      : "";
+    const body = await res.json().catch(() => null) as { message?: string } | null;
+    const msg = body?.message ?? "";
     if (msg.toLowerCase().includes("rate limit")) {
       throw new Error("GitHub API rate limit exceeded. Please try again later.");
     }
@@ -253,9 +251,15 @@ export async function fetchGitHubChart(
   const repoPath = (relPath: string): string =>
     chartRoot ? `${chartRoot}/${relPath}` : relPath;
 
-  /** Write content to destDir, creating intermediate directories. */
+  /** Write content to destDir, creating intermediate directories.
+   *  Guards against path traversal by verifying the resolved path
+   *  stays within destDir. */
   async function saveFile(relPath: string, content: Buffer): Promise<void> {
-    const destPath = path.join(destDir, relPath);
+    const destPath = path.resolve(destDir, relPath);
+    // Ensure the resolved path is within destDir (prevents path traversal)
+    if (!destPath.startsWith(destDir + path.sep) && destPath !== destDir) {
+      throw new Error(`Path traversal detected in chart file path: ${relPath}`);
+    }
     await mkdir(path.dirname(destPath), { recursive: true });
     await writeFile(destPath, content);
   }

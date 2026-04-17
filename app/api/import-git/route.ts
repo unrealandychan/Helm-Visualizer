@@ -19,7 +19,9 @@ interface CacheEntry {
 const chartCache = new Map<string, CacheEntry>();
 
 function cacheKey(url: string): string {
-  return url.trim().toLowerCase().replace(/\/$/, "");
+  // Preserve case of owner/repo (GitHub redirects case variants, but owner/repo
+  // names are canonical). Only trim whitespace and drop a trailing slash.
+  return url.trim().replace(/\/$/, "");
 }
 
 function getCache(key: string): CacheEntry | null {
