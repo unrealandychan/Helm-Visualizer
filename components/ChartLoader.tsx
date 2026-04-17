@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Upload, Globe, FolderOpen, Search, ChevronRight, AlertCircle, AlertTriangle, CheckCircle2, Clock, Zap, GitCompare } from "lucide-react";
+import { Upload, Globe, FolderOpen, Search, ChevronRight, AlertCircle, AlertTriangle, CheckCircle2, Clock, Zap, GitCompare, GitBranch } from "lucide-react";
 import clsx from "clsx";
 import yaml from "js-yaml";
 import type { ChartRenderResult, ArtifactHubPackage, ValidationIssue } from "@/types/helm";
@@ -11,7 +11,7 @@ import { computeValuesDiff } from "@/lib/valueDiff";
 import { EnvDiffPanel } from "@/components/EnvDiffPanel";
 import type { ValuesDiffResult } from "@/types/helm";
 
-type Tab = "workspace" | "upload" | "artifacthub" | "history" | "compare";
+type Tab = "workspace" | "upload" | "artifacthub" | "github" | "history" | "compare";
 
 const POPULAR_CHARTS = [
   { name: "nginx",      repo: "bitnami",      desc: "NGINX web server"            },
@@ -25,7 +25,7 @@ const POPULAR_CHARTS = [
 ];
 
 interface ChartLoaderProps {
-  onLoad: (result: ChartRenderResult, source: "workspace" | "upload" | "artifacthub", url?: string) => void;
+  onLoad: (result: ChartRenderResult, source: "workspace" | "upload" | "artifacthub" | "github", url?: string) => void;
   history?: HistoryEntry[];
 }
 
@@ -51,6 +51,9 @@ export function ChartLoader({ onLoad, history = [] }: ChartLoaderProps) {
   const [ahSearch, setAhSearch] = useState("");
   const [ahResults, setAhResults] = useState<ArtifactHubPackage[]>([]);
   const [ahSearching, setAhSearching] = useState(false);
+
+  // GitHub import state
+  const [gitUrl, setGitUrl] = useState("");
 
   // Compare tab state
   const [compareFileA, setCompareFileA] = useState<{ name: string; content: string } | null>(null);
@@ -101,6 +104,23 @@ export function ChartLoader({ onLoad, history = [] }: ChartLoaderProps) {
     );
   }
 
+  async function loadFromGitHub() {
+    if (!gitUrl.trim()) {
+      setError("Please enter a GitHub repository URL.");
+      return;
+    }
+    await fetchWithLoading(
+      () =>
+        fetch("/api/import-git", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: gitUrl.trim() }),
+        }),
+      "github",
+      gitUrl.trim()
+    );
+  }
+
   async function searchArtifactHub() {
     if (ahSearch.trim().length < 2) return;
     setAhSearching(true);
@@ -146,7 +166,7 @@ export function ChartLoader({ onLoad, history = [] }: ChartLoaderProps) {
     );
   }
 
-  async function fetchWithLoading(fn: () => Promise<Response>, source: "workspace" | "upload" | "artifacthub", url?: string) {
+  async function fetchWithLoading(fn: () => Promise<Response>, source: "workspace" | "upload" | "artifacthub" | "github", url?: string) {
     setLoading(true);
     setError(null);
     setValidationIssues([]);
@@ -242,7 +262,7 @@ export function ChartLoader({ onLoad, history = [] }: ChartLoaderProps) {
     <div className="bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl w-full max-w-2xl mx-auto p-5">
       {/* Tabs */}
       <div className="flex gap-1 mb-5 bg-zinc-800 rounded-lg p-1">
-        {(["history", "workspace", "upload", "artifacthub", "compare"] as Tab[]).map((tab) => (
+        {(["history", "workspace", "upload", "artifacthub", "github", "compare"] as Tab[]).map((tab) => (
           <button
             key={tab}
             onClick={() => { setActiveTab(tab); setError(null); }}
@@ -257,10 +277,12 @@ export function ChartLoader({ onLoad, history = [] }: ChartLoaderProps) {
             {tab === "workspace"   && <FolderOpen className="w-3 h-3" />}
             {tab === "upload"      && <Upload className="w-3 h-3" />}
             {tab === "artifacthub" && <Globe className="w-3 h-3" />}
+            {tab === "github"      && <GitBranch className="w-3 h-3" />}
             {tab === "compare"     && <GitCompare className="w-3 h-3" />}
             {tab === "history"     ? "Recent" :
              tab === "workspace"   ? "Workspace" :
              tab === "upload"      ? "Upload" :
+             tab === "github"      ? "GitHub" :
              tab === "compare"     ? "Compare" : "Artifact Hub"}
             {tab === "history" && history.length > 0 && (
               <span className="bg-blue-600 text-white text-[9px] rounded-full px-1 leading-none py-0.5">
@@ -291,6 +313,7 @@ export function ChartLoader({ onLoad, history = [] }: ChartLoaderProps) {
                   {entry.source === "workspace" && <FolderOpen className="w-4 h-4 text-blue-400 shrink-0" />}
                   {entry.source === "upload"    && <Upload className="w-4 h-4 text-green-400 shrink-0" />}
                   {entry.source === "artifacthub" && <Globe className="w-4 h-4 text-yellow-400 shrink-0" />}
+                  {entry.source === "github"    && <GitBranch className="w-4 h-4 text-purple-400 shrink-0" />}
                   <div className="min-w-0 flex-1">
                     <div className="text-white text-sm font-medium truncate">{entry.name}</div>
                     <div className="text-zinc-500 text-xs">
@@ -450,6 +473,58 @@ export function ChartLoader({ onLoad, history = [] }: ChartLoaderProps) {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {activeTab === "github" && (
+        <div className="space-y-4">
+          <p className="text-xs text-zinc-400">
+            Import a Helm chart directly from a public GitHub repository.
+          </p>
+          <div>
+            <label className="text-xs text-zinc-400 mb-1 block">GitHub Repository URL</label>
+            <div className="flex gap-2">
+              <input
+                type="url"
+                placeholder="https://github.com/user/repo/tree/main"
+                value={gitUrl}
+                onChange={(e) => setGitUrl(e.target.value)}
+                className="flex-1 bg-zinc-800 border border-zinc-600 rounded-lg text-sm text-white px-3 py-2 outline-none focus:border-blue-500 placeholder-zinc-500"
+                onKeyDown={(e) => e.key === "Enter" && loadFromGitHub()}
+              />
+              <button
+                onClick={loadFromGitHub}
+                disabled={loading}
+                className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-1"
+              >
+                {loading ? "…" : <ChevronRight className="w-4 h-4" />}
+              </button>
+            </div>
+            <p className="text-zinc-600 text-[11px] mt-1.5">
+              Supports{" "}
+              <code className="bg-zinc-800 px-1 rounded">https://github.com/owner/repo/tree/branch[/path]</code>
+              . Results are cached for 24 h.
+            </p>
+          </div>
+
+          {/* Example hints */}
+          <div className="rounded-lg border border-zinc-700 bg-zinc-800/50 p-3 space-y-1.5">
+            <p className="text-[11px] text-zinc-400 font-medium flex items-center gap-1">
+              <GitBranch className="w-3 h-3" /> Example URLs
+            </p>
+            {[
+              "https://github.com/prometheus-community/helm-charts/tree/main/charts/prometheus",
+              "https://github.com/argoproj/argo-helm/tree/main/charts/argo-cd",
+            ].map((ex) => (
+              <button
+                key={ex}
+                onClick={() => setGitUrl(ex)}
+                className="block w-full text-left text-[11px] text-zinc-500 hover:text-blue-400 truncate transition-colors"
+              >
+                {ex}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
