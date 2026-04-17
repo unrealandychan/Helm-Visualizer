@@ -295,26 +295,37 @@ export async function fetchGitHubChart(
   );
 
   // ── 4. templates/ ─────────────────────────────────────────────────────────
-  const templateItems = await listContents(owner, repo, repoPath("templates"), ref);
-  const templateFiles = templateItems.filter(
-    (item) =>
-      item.type === "file" &&
-      (item.name.endsWith(".yaml") ||
-        item.name.endsWith(".yml") ||
-        item.name.endsWith(".tpl") ||
-        item.name.endsWith(".txt"))
-  );
+  const isTemplateFile = (filePath: string) =>
+    filePath.endsWith(".yaml") ||
+    filePath.endsWith(".yml") ||
+    filePath.endsWith(".tpl") ||
+    filePath.endsWith(".txt");
+
+  const collectTemplateFiles = async (dir: string): Promise<string[]> => {
+    const items = await listContents(owner, repo, repoPath(dir), ref);
+    const nestedFiles = await Promise.all(
+      items.map(async (item) => {
+        const itemPath = `${dir}/${item.name}`;
+        if (item.type === "dir") {
+          return collectTemplateFiles(itemPath);
+        }
+        if (item.type === "file" && isTemplateFile(itemPath)) {
+          return [itemPath];
+        }
+        return [];
+      })
+    );
+
+    return nestedFiles.flat();
+  };
+
+  const templateFiles = await collectTemplateFiles("templates");
 
   await Promise.all(
-    templateFiles.map(async (item) => {
-      const content = await fetchRawFile(
-        owner,
-        repo,
-        repoPath(`templates/${item.name}`),
-        ref
-      );
+    templateFiles.map(async (templatePath) => {
+      const content = await fetchRawFile(owner, repo, repoPath(templatePath), ref);
       if (content) {
-        await saveFile(`templates/${item.name}`, content);
+        await saveFile(templatePath, content);
       }
     })
   );
