@@ -328,8 +328,9 @@ function CodeBlock({ className, children }: { className?: string; children?: Rea
       </pre>
       <button
         onClick={handleCopy}
-        className="absolute top-2 right-2 flex items-center gap-1 px-1.5 py-1 rounded bg-zinc-700 hover:bg-zinc-600 text-zinc-300 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"
+        className="absolute top-2 right-2 flex items-center gap-1 px-1.5 py-1 rounded bg-zinc-700 hover:bg-zinc-600 text-zinc-300 text-[10px] opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus:opacity-100 transition-opacity"
         title={copyState === "error" ? "Copy failed" : "Copy code"}
+        aria-label={copyState === "error" ? "Copy failed" : "Copy code"}
         type="button"
       >
         {copyState === "copied" ? (
