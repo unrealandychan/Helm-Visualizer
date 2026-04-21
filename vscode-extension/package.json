@@ -1,9 +1,10 @@
 {
   "name": "helm-visualizer",
-  "displayName": "Helm Visualizer",
+  "displayName": "Helm Visualizer (Beta)",
   "description": "Visualize Helm charts, diff environments, and explore Kubernetes resources inside VS Code.",
   "version": "0.1.0",
   "publisher": "unrealandychan",
+  "preview": true,
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -19,7 +20,10 @@
   "engines": {
     "vscode": "^1.85.0"
   },
-  "activationEvents": [],
+  "activationEvents": [
+    "onCommand:helmVisualizer.open",
+    "onCommand:helmVisualizer.openInBrowser"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [

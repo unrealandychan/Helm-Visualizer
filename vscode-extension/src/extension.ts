@@ -113,6 +113,14 @@ class HelmVisualizerPanel {
       // keep default origin; error will surface in the iframe anyway
     }
 
+    // Produce a JSON literal that is safe to embed inside a <script> block:
+    // the raw output of JSON.stringify can contain "</script" or "<!--" which
+    // would break out of the script context.  Escaping < and > to their
+    // Unicode escape sequences prevents this without changing the JS value.
+    const safeJsonUrl = JSON.stringify(appUrl)
+      .replace(/</g, "\\u003c")
+      .replace(/>/g, "\\u003e");
+
     return /* html */ `<!DOCTYPE html>
 <html lang="en" style="height:100%;margin:0;padding:0;">
 <head>
@@ -195,7 +203,7 @@ class HelmVisualizerPanel {
     const vscode = acquireVsCodeApi();
     const frame = document.getElementById('app-frame');
     const banner = document.getElementById('error-banner');
-    const baseUrl = ${JSON.stringify(appUrl)};
+    const baseUrl = ${safeJsonUrl};
 
     // Reload using a cache-busting query parameter so the iframe always
     // re-fetches the page, regardless of same-origin restrictions.
