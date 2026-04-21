@@ -70,9 +70,6 @@ helm plugin install ./helm-plugin
 # Visualize any local chart
 helm viz ./my-chart
 
-# Merge an extra values file
-helm viz ./my-chart -f ./my-chart/values.prod.yaml
-
 # Use a custom port
 helm viz --port 8080 ./my-chart
 
