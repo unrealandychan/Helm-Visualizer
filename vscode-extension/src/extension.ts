@@ -5,12 +5,19 @@ import * as vscode from "vscode";
 // ---------------------------------------------------------------------------
 
 let currentPanel: HelmVisualizerPanel | undefined;
+let helmTerminal: vscode.Terminal | undefined;
 
 // ---------------------------------------------------------------------------
 // Extension lifecycle
 // ---------------------------------------------------------------------------
 
 export function activate(context: vscode.ExtensionContext): void {
+  // Register sidebar tree view
+  const sidebarProvider = new HelmSidebarProvider();
+  context.subscriptions.push(
+    vscode.window.registerTreeDataProvider("helmVisualizerSidebar", sidebarProvider),
+  );
+
   context.subscriptions.push(
     vscode.commands.registerCommand("helmVisualizer.open", () => {
       HelmVisualizerPanel.createOrShow(context.extensionUri);
@@ -19,11 +26,15 @@ export function activate(context: vscode.ExtensionContext): void {
       const url = getAppUrl();
       vscode.env.openExternal(vscode.Uri.parse(url));
     }),
+    vscode.commands.registerCommand("helmVisualizer.openCli", () => {
+      openHelmTerminal();
+    }),
   );
 }
 
 export function deactivate(): void {
   currentPanel?.dispose();
+  helmTerminal?.dispose();
 }
 
 // ---------------------------------------------------------------------------
@@ -36,6 +47,69 @@ function getAppUrl(): string {
       .getConfiguration("helmVisualizer")
       .get<string>("appUrl") ?? "http://localhost:3000"
   );
+}
+
+function openHelmTerminal(): void {
+  // Reuse existing terminal if it is still alive
+  if (helmTerminal && helmTerminal.exitStatus === undefined) {
+    helmTerminal.show(false);
+    return;
+  }
+  helmTerminal = vscode.window.createTerminal({
+    name: "Helm CLI",
+    iconPath: new vscode.ThemeIcon("terminal"),
+  });
+  helmTerminal.show(false);
+}
+
+// ---------------------------------------------------------------------------
+// Sidebar TreeDataProvider
+// ---------------------------------------------------------------------------
+
+class HelmSidebarItem extends vscode.TreeItem {
+  constructor(
+    label: string,
+    command: vscode.Command,
+    icon: string,
+    description?: string,
+  ) {
+    super(label, vscode.TreeItemCollapsibleState.None);
+    this.command = command;
+    this.iconPath = new vscode.ThemeIcon(icon);
+    this.description = description;
+    this.tooltip = label;
+  }
+}
+
+class HelmSidebarProvider implements vscode.TreeDataProvider<HelmSidebarItem> {
+  constructor() {}
+
+  getTreeItem(element: HelmSidebarItem): vscode.TreeItem {
+    return element;
+  }
+
+  getChildren(): HelmSidebarItem[] {
+    return [
+      new HelmSidebarItem(
+        "Open Helm Visualizer",
+        { title: "Open Helm Visualizer", command: "helmVisualizer.open" },
+        "graph",
+        "Open in panel",
+      ),
+      new HelmSidebarItem(
+        "Open in Browser",
+        { title: "Open in Browser", command: "helmVisualizer.openInBrowser" },
+        "link-external",
+        getAppUrl(),
+      ),
+      new HelmSidebarItem(
+        "Open Helm CLI Terminal",
+        { title: "Open Helm CLI Terminal", command: "helmVisualizer.openCli" },
+        "terminal",
+        "Run helm commands",
+      ),
+    ];
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -62,7 +136,7 @@ class HelmVisualizerPanel {
 
     // Handle configuration changes while the panel is open
     this._disposables.push(
-      vscode.workspace.onDidChangeConfiguration((e) => {
+      vscode.workspace.onDidChangeConfiguration((e: vscode.ConfigurationChangeEvent) => {
         if (e.affectsConfiguration("helmVisualizer.appUrl")) {
           this._panel.webview.html = this._buildHtml(getAppUrl());
         }
@@ -264,3 +338,4 @@ function escapeHtml(str: string): string {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 }
+
