@@ -57,15 +57,25 @@ The Helm Visualizer is also available as a VS Code extension that embeds the web
 
 ### Install
 
-**From VSIX (CLI):**
+**Option A — VS Marketplace:**
+
+Search for **Helm Visualizer** in the Extensions sidebar, or run:
 
 ```bash
-code --install-extension helm-visualizer-0.1.0.vsix
+code --install-extension unrealandychan.helm-visualizer
 ```
 
-**From VS Marketplace:**
+**Option B — Local build (no marketplace):**
 
-Search for **Helm Visualizer** in the Extensions sidebar, or visit the [VS Marketplace page](https://marketplace.visualstudio.com/items?itemName=unrealandychan.helm-visualizer).
+One-command build and install:
+
+```bash
+cd vscode-extension
+npm run install-local
+```
+
+This compiles the TypeScript, packages the VSIX, and calls `code --install-extension` for you.
+Reload VS Code afterwards (`Ctrl+Shift+P` → **Developer: Reload Window**).
 
 ### Usage
 
@@ -79,20 +89,18 @@ Search for **Helm Visualizer** in the Extensions sidebar, or visit the [VS Marke
 The extension panel embeds the full web app at `http://localhost:3000` by default.
 Use **Helm Visualizer: Open in Browser** to open in your default browser instead.
 
+### Publish to VS Marketplace
+
+```bash
+cd vscode-extension
+VSCE_PAT=<your-token> npm run publish-marketplace
+```
+
 ### Configuration
 
 | Setting | Default | Description |
 |---|---|---|
 | `helmVisualizer.appUrl` | `http://localhost:3000` | URL of the running Helm Visualizer server |
-
-### Build the extension locally
-
-```bash
-cd vscode-extension
-npm install
-npm run compile     # TypeScript → out/
-npm run package     # produces helm-visualizer-<version>.vsix
-```
 
 See [`vscode-extension/README.md`](vscode-extension/README.md) for full details.
 

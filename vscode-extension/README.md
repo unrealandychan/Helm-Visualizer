@@ -46,6 +46,39 @@ Set `helmVisualizer.appUrl` in your VS Code settings to point to your deployed U
 
 ---
 
+## Install
+
+### Option A — VS Marketplace (easiest)
+
+Search for **Helm Visualizer** in the VS Code Extensions sidebar, or run:
+
+```bash
+code --install-extension unrealandychan.helm-visualizer
+```
+
+### Option B — Local build (no marketplace needed)
+
+Use the one-command script that builds the VSIX and installs it for you:
+
+```bash
+cd vscode-extension
+npm run install-local
+```
+
+Or step by step:
+
+```bash
+cd vscode-extension
+npm install                  # install build tools
+npm run compile              # TypeScript → out/
+npm run package              # produces helm-visualizer-<version>.vsix
+code --install-extension helm-visualizer-<version>.vsix
+```
+
+> Reload VS Code after install (`Ctrl+Shift+P` → **Developer: Reload Window**).
+
+---
+
 ## Usage
 
 ### Open the panel
@@ -57,12 +90,6 @@ Set `helmVisualizer.appUrl` in your VS Code settings to point to your deployed U
 
 - Command Palette → **Helm Visualizer: Open in Browser**
 
-### Install from VSIX (CLI)
-
-```bash
-code --install-extension helm-visualizer-0.1.0.vsix
-```
-
 ---
 
 ## Extension Settings
@@ -73,23 +100,38 @@ code --install-extension helm-visualizer-0.1.0.vsix
 
 ---
 
-## Building and Packaging
+## Publish to VS Marketplace
+
+Set your Azure DevOps Personal Access Token (Marketplace → Publish scope) and run:
 
 ```bash
 cd vscode-extension
-npm install
-npm run compile        # compile TypeScript → out/
-npm run package        # create helm-visualizer-<version>.vsix
+VSCE_PAT=<your-token> npm run publish-marketplace
 ```
 
-### Publish to VS Marketplace
+Or use the script directly:
 
 ```bash
-npm run publish        # requires VSCE_PAT environment variable
+VSCE_PAT=<your-token> bash scripts/publish-marketplace.sh
 ```
+
+Get a PAT: <https://code.visualstudio.com/api/working-with-extensions/publishing-extension#get-a-personal-access-token>
+
+---
+
+## Scripts Reference
+
+| Script | Command | Description |
+|---|---|---|
+| Compile | `npm run compile` | TypeScript → `out/` |
+| Watch | `npm run watch` | Recompile on file change |
+| Package | `npm run package` | Build VSIX archive |
+| **Install locally** | `npm run install-local` | Build VSIX and install into VS Code |
+| **Publish** | `VSCE_PAT=<tok> npm run publish-marketplace` | Publish to VS Marketplace |
 
 ---
 
 ## License
 
 Apache 2.0 — see [LICENSE](../LICENSE).
+
