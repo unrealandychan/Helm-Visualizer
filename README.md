@@ -51,6 +51,46 @@ To enable the AI Chat Assistant, copy `env.example` to `.env.local`, set your `O
 
 ---
 
+## Helm CLI Plugin (`helm viz`)
+
+The Helm Visualizer ships as a **Helm CLI plugin** so you can launch the visualizer directly from your terminal — no browser bookmarks or manual server management required.
+
+### Install
+
+```bash
+git clone https://github.com/unrealandychan/Helm-Visualizer
+cd Helm-Visualizer
+npm install
+helm plugin install ./helm-plugin
+```
+
+### Usage
+
+```bash
+# Visualize any local chart
+helm viz ./my-chart
+
+# Merge an extra values file
+helm viz ./my-chart -f ./my-chart/values.prod.yaml
+
+# Use a custom port
+helm viz --port 8080 ./my-chart
+
+# Connect to a Visualizer already running on a custom URL
+helm viz --url http://localhost:3000 ./my-chart
+```
+
+Running `helm viz` will:
+1. Validate the chart directory (must contain `Chart.yaml`)
+2. Start the Helm Visualizer Next.js server (if not already running)
+3. Open the interactive graph in your default browser
+
+Press **Ctrl+C** to stop the server when done.
+
+See [`helm-plugin/README.md`](helm-plugin/README.md) for full documentation, Windows support, and troubleshooting.
+
+---
+
 ## VS Code Extension
 
 The Helm Visualizer is also available as a VS Code extension that embeds the web app directly inside an editor panel.
@@ -201,6 +241,12 @@ helm-chart-visualizer/
 │   ├── tsconfig.json
 │   ├── .vscodeignore
 │   └── README.md             # Extension-specific docs
+├── helm-plugin/              # Helm CLI plugin (helm viz)
+│   ├── plugin.yaml           # Helm plugin descriptor
+│   ├── scripts/
+│   │   ├── run.sh            # Unix/macOS entry point
+│   │   └── run.bat           # Windows entry point
+│   └── README.md             # Plugin-specific docs
 ├── env.example               # Template for .env.local (LLM config)
 └── helm/                     # Sample workspace chart (multi-env webapp)
     ├── Chart.yaml
