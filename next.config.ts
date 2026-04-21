@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const nextConfig: NextConfig = {
   serverExternalPackages: ["tar"],
@@ -6,6 +7,9 @@ const nextConfig: NextConfig = {
     serverActions: {
       bodySizeLimit: "50mb",
     },
+  },
+  turbopack: {
+    root: path.resolve(__dirname),
   },
 };
 
