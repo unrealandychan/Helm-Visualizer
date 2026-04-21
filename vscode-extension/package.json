@@ -1,0 +1,72 @@
+{
+  "name": "helm-visualizer",
+  "displayName": "Helm Visualizer",
+  "description": "Visualize Helm charts, diff environments, and explore Kubernetes resources inside VS Code.",
+  "version": "0.1.0",
+  "publisher": "unrealandychan",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/unrealandychan/Helm-Visualizer"
+  },
+  "bugs": {
+    "url": "https://github.com/unrealandychan/Helm-Visualizer/issues"
+  },
+  "homepage": "https://github.com/unrealandychan/Helm-Visualizer#readme",
+  "icon": "icon.png",
+  "categories": ["Other", "Visualization"],
+  "keywords": ["helm", "kubernetes", "k8s", "chart", "visualizer"],
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "helmVisualizer.open",
+        "title": "Helm Visualizer: Open",
+        "category": "Helm Visualizer",
+        "icon": "$(graph)"
+      },
+      {
+        "command": "helmVisualizer.openInBrowser",
+        "title": "Helm Visualizer: Open in Browser",
+        "category": "Helm Visualizer",
+        "icon": "$(link-external)"
+      }
+    ],
+    "configuration": {
+      "title": "Helm Visualizer",
+      "properties": {
+        "helmVisualizer.appUrl": {
+          "type": "string",
+          "default": "http://localhost:3000",
+          "description": "URL of the Helm Visualizer web app. Start the dev server with `npm run dev` in the repository root, or point to your deployed instance."
+        }
+      }
+    },
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "helmVisualizer.open"
+        },
+        {
+          "command": "helmVisualizer.openInBrowser"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "npx @vscode/vsce package",
+    "publish": "npx @vscode/vsce publish"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@types/node": "^20",
+    "typescript": "^5"
+  }
+}

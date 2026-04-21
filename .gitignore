@@ -42,3 +42,8 @@ next-env.d.ts
 
 # helm chart visualizer temp files
 /tmp/
+
+# vscode extension build artifacts
+/vscode-extension/out/
+/vscode-extension/node_modules/
+/vscode-extension/*.vsix
