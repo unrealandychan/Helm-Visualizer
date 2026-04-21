@@ -10,7 +10,6 @@ A Helm CLI plugin that launches the **Helm Chart Visualizer** web UI directly fr
 
 - **One command** — `helm viz ./my-chart` starts the server and opens the browser
 - **Chart directory argument** — point at any local Helm chart directory
-- **Values override** — merge an extra `values.yaml` with `-f`
 - **Port control** — choose a custom port with `--port`
 - **Smart server detection** — if the Visualizer is already running, the plugin reuses it
 
