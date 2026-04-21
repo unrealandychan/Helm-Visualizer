@@ -1,8 +1,11 @@
 # Helm Chart Visualizer
 
 [![GitHub Repo](https://img.shields.io/badge/GitHub-unrealandychan%2FHelm--Visualizer-blue?logo=github)](https://github.com/unrealandychan/Helm-Visualizer)
+[![VS Marketplace](https://img.shields.io/visual-studio-marketplace/v/unrealandychan.helm-visualizer?label=VS%20Code%20Extension)](https://marketplace.visualstudio.com/items?itemName=unrealandychan.helm-visualizer)
 
 An interactive, browser-based Helm chart renderer and Kubernetes resource graph — uses Helm CLI when available, falls back to pure-JS renderer, no cluster access required.
+
+Available as a **[VS Code Extension](#vs-code-extension)** — visualize Helm charts without leaving your editor.
 
 Paste an Artifact Hub URL, upload a `.tgz` chart, or load the chart from your own workspace. Switch environments, diff configs, and explore every rendered resource.
 
@@ -45,6 +48,61 @@ npm run dev
 Open http://localhost:3000. The workspace chart (`helm/`) is loaded automatically.
 
 To enable the AI Chat Assistant, copy `env.example` to `.env.local`, set your `OPENAI_API_KEY`, then restart the dev server (see [LLM Chat Assistant](#llm-chat-assistant) for details).
+
+---
+
+## VS Code Extension
+
+The Helm Visualizer is also available as a VS Code extension that embeds the web app directly inside an editor panel.
+
+### Install
+
+**Option A — VS Marketplace:**
+
+Search for **Helm Visualizer** in the Extensions sidebar, or run:
+
+```bash
+code --install-extension unrealandychan.helm-visualizer
+```
+
+**Option B — Local build (no marketplace):**
+
+One-command build and install:
+
+```bash
+cd vscode-extension
+npm run install-local
+```
+
+This compiles the TypeScript, packages the VSIX, and calls `code --install-extension` for you.
+Reload VS Code afterwards (`Ctrl+Shift+P` → **Developer: Reload Window**).
+
+### Usage
+
+1. Start the dev server in the repo root (if running locally):
+   ```bash
+   npm run dev
+   ```
+2. Open the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`)
+3. Run **Helm Visualizer: Open**
+
+The extension panel embeds the full web app at `http://localhost:3000` by default.
+Use **Helm Visualizer: Open in Browser** to open in your default browser instead.
+
+### Publish to VS Marketplace
+
+```bash
+cd vscode-extension
+VSCE_PAT=<your-token> npm run publish-marketplace
+```
+
+### Configuration
+
+| Setting | Default | Description |
+|---|---|---|
+| `helmVisualizer.appUrl` | `http://localhost:3000` | URL of the running Helm Visualizer server |
+
+See [`vscode-extension/README.md`](vscode-extension/README.md) for full details.
 
 ---
 
@@ -136,6 +194,13 @@ helm-chart-visualizer/
 │   └── valuesBuilder.ts         # Extracts & annotates the values tree
 ├── types/
 │   └── helm.ts               # Shared TypeScript types
+├── vscode-extension/         # VS Code extension wrapper
+│   ├── package.json          # Extension manifest (publisher, commands, settings)
+│   ├── src/
+│   │   └── extension.ts      # Extension entry point (WebviewPanel)
+│   ├── tsconfig.json
+│   ├── .vscodeignore
+│   └── README.md             # Extension-specific docs
 ├── env.example               # Template for .env.local (LLM config)
 └── helm/                     # Sample workspace chart (multi-env webapp)
     ├── Chart.yaml

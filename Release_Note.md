@@ -1,6 +1,49 @@
 # Release Notes
 
-## Helm Visualizer — Recent Updates (April 14–16, 2026)
+## Helm Visualizer — v0.2.0 (April 21, 2026)
+
+---
+
+### 🆕 New Features
+
+#### VS Code Extension — Beta (PR #62 · April 21, 2026)
+
+> ⚠️ **Beta**: This is the first release of the VS Code extension. APIs and behavior may change before the stable release.
+
+The Helm Visualizer is now available as a **VS Code extension** (`unrealandychan.helm-visualizer`) that embeds the full web app inside an editor panel via a `WebviewPanel` + iframe.
+
+Key highlights:
+
+- **Embedded panel** — Open the Helm Visualizer app directly inside VS Code via the Command Palette (`Helm Visualizer: Open`).
+- **Open in Browser fallback** — One-click command to open the app in your default browser (`Helm Visualizer: Open in Browser`).
+- **Configurable URL** — `helmVisualizer.appUrl` setting lets you point the extension at any running instance (local dev or deployed).
+- **Live config reload** — The panel reloads automatically when the URL setting changes.
+- **Load-failure detection** — 8-second timeout plus an iframe load check shows an actionable error banner when the server isn't reachable.
+- **Install scripts** — `scripts/install-local.sh` and `scripts/publish-marketplace.sh` (plus `npm run install-local` / `npm run publish-marketplace`) make building, installing, and publishing the extension a one-command operation.
+
+**Install (VS Marketplace):**
+
+```bash
+code --install-extension unrealandychan.helm-visualizer
+```
+
+**Install (local build — no marketplace):**
+
+```bash
+cd vscode-extension
+npm run install-local
+```
+
+**Publish to VS Marketplace:**
+
+```bash
+cd vscode-extension
+VSCE_PAT=<token> npm run publish-marketplace
+```
+
+---
+
+## Helm Visualizer — v0.1.0 / Recent Updates (April 14–16, 2026)
 
 ---
 
