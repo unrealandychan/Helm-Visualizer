@@ -60,7 +60,7 @@
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
+    "watch": "tsc --watch -p ./",
     "package": "npx @vscode/vsce package --no-yarn",
     "install-local": "bash scripts/install-local.sh",
     "publish-marketplace": "bash scripts/publish-marketplace.sh"
