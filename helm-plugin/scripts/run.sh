@@ -140,8 +140,8 @@ fi
 is_server_running() {
   local url="${1:-http://localhost:${PORT}}"
   if ! command -v curl &>/dev/null; then
-    echo "Warning: 'curl' is not installed — cannot verify server status." >&2
-    return 1
+    echo "Error: 'curl' is required to verify server readiness. Please install 'curl' and try again." >&2
+    exit 1
   fi
   curl -sf "${url}/api/workspace-chart" --max-time 2 > /dev/null 2>&1
 }
