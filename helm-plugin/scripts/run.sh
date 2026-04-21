@@ -75,14 +75,29 @@ while [[ $# -gt 0 ]]; do
       exit 0
       ;;
     -p|--port)
+      if [[ $# -lt 2 ]]; then
+        echo "Error: $1 requires a value." >&2
+        echo "Run 'helm viz --help' for usage." >&2
+        exit 1
+      fi
       PORT="$2"
       shift 2
       ;;
     -f|--values)
+      if [[ $# -lt 2 ]]; then
+        echo "Error: $1 requires a value." >&2
+        echo "Run 'helm viz --help' for usage." >&2
+        exit 1
+      fi
       EXTRA_VALUES="$2"
       shift 2
       ;;
     --url)
+      if [[ $# -lt 2 ]]; then
+        echo "Error: $1 requires a value." >&2
+        echo "Run 'helm viz --help' for usage." >&2
+        exit 1
+      fi
       APP_URL="$2"
       shift 2
       ;;
