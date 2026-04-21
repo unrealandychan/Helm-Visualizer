@@ -9,8 +9,13 @@ import { buildGraph } from "@/lib/graphBuilder";
 import yaml from "js-yaml";
 import { extractEnvName } from "@/lib/chartRenderer";
 
-// The workspace's own helm chart lives here relative to process.cwd()
-const CHART_DIR = path.join(process.cwd(), "helm");
+// The workspace helm chart directory.
+// When the server is launched by `helm viz`, HELM_CHART_DIR is set to the
+// chart directory supplied on the command line; otherwise fall back to the
+// conventional helm/ directory inside the repository root.
+const CHART_DIR = process.env.HELM_CHART_DIR
+  ? path.resolve(process.env.HELM_CHART_DIR)
+  : path.join(process.cwd(), "helm");
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);

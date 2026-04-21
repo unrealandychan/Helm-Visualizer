@@ -1,0 +1,27 @@
+name: "viz"
+version: "0.1.0"
+usage: "helm viz [CHART_DIR] [flags]"
+description: |-
+  Launch the Helm Chart Visualizer web UI for a given chart directory.
+
+  Starts a local Next.js server (or connects to one already running) and opens
+  the interactive graph in your default browser.
+
+  The Helm Visualizer app must be available — either by installing the plugin
+  from within the cloned repository, or by setting HELM_VISUALIZER_DIR to the
+  app's root directory.
+
+  Examples:
+    helm viz ./my-chart
+    helm viz ./my-chart --values ./my-chart/values.prod.yaml
+    helm viz --port 8080
+    helm viz --url http://localhost:3000 ./my-chart
+
+command: "$HELM_PLUGIN_DIR/scripts/run.sh"
+platformCommand:
+  - os: windows
+    arch: amd64
+    command: "$HELM_PLUGIN_DIR/scripts/run.bat"
+  - os: windows
+    arch: arm64
+    command: "$HELM_PLUGIN_DIR/scripts/run.bat"
