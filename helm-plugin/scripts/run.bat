@@ -206,7 +206,9 @@ if not exist "node_modules\" (
 
 :: Export environment variables for the Next.js server
 set "HELM_CHART_DIR=!CHART_DIR!"
-if not "!EXTRA_VALUES!"=="" set "HELM_VIZ_EXTRA_VALUES=!EXTRA_VALUES!"
+if not "!EXTRA_VALUES!"=="" (
+    echo Warning: --values is currently ignored because the Helm Visualizer server does not support HELM_VIZ_EXTRA_VALUES. 1>&2
+)
 set "PORT=!PORT!"
 
 :: Start the dev server in a new window so Ctrl+C in this window kills it cleanly
