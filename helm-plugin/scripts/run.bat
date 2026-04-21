@@ -24,11 +24,81 @@ if defined HELM_VIZ_PORT set "PORT=%HELM_VIZ_PORT%"
 if "%~1"=="" goto :end_parse
 if /i "%~1"=="-h"       goto :show_help
 if /i "%~1"=="--help"   goto :show_help
-if /i "%~1"=="-p"       ( set "PORT=%~2"       & shift & shift & goto :parse_args )
-if /i "%~1"=="--port"   ( set "PORT=%~2"       & shift & shift & goto :parse_args )
-if /i "%~1"=="-f"       ( set "EXTRA_VALUES=%~2" & shift & shift & goto :parse_args )
-if /i "%~1"=="--values" ( set "EXTRA_VALUES=%~2" & shift & shift & goto :parse_args )
-if /i "%~1"=="--url"    ( set "APP_URL=%~2"    & shift & shift & goto :parse_args )
+if /i "%~1"=="-p" (
+    if "%~2"=="" (
+        echo Error: Flag %~1 requires a value. 1>&2
+        echo Run 'helm viz --help' for usage. 1>&2
+        exit /b 1
+    )
+    echo %~2 | findstr /r "^-" >nul 2>&1
+    if !errorlevel!==0 (
+        echo Error: Flag %~1 requires a value; got another flag '%~2'. 1>&2
+        echo Run 'helm viz --help' for usage. 1>&2
+        exit /b 1
+    )
+    set "PORT=%~2"
+    shift & shift & goto :parse_args
+)
+if /i "%~1"=="--port" (
+    if "%~2"=="" (
+        echo Error: Flag %~1 requires a value. 1>&2
+        echo Run 'helm viz --help' for usage. 1>&2
+        exit /b 1
+    )
+    echo %~2 | findstr /r "^-" >nul 2>&1
+    if !errorlevel!==0 (
+        echo Error: Flag %~1 requires a value; got another flag '%~2'. 1>&2
+        echo Run 'helm viz --help' for usage. 1>&2
+        exit /b 1
+    )
+    set "PORT=%~2"
+    shift & shift & goto :parse_args
+)
+if /i "%~1"=="-f" (
+    if "%~2"=="" (
+        echo Error: Flag %~1 requires a value. 1>&2
+        echo Run 'helm viz --help' for usage. 1>&2
+        exit /b 1
+    )
+    echo %~2 | findstr /r "^-" >nul 2>&1
+    if !errorlevel!==0 (
+        echo Error: Flag %~1 requires a value; got another flag '%~2'. 1>&2
+        echo Run 'helm viz --help' for usage. 1>&2
+        exit /b 1
+    )
+    set "EXTRA_VALUES=%~2"
+    shift & shift & goto :parse_args
+)
+if /i "%~1"=="--values" (
+    if "%~2"=="" (
+        echo Error: Flag %~1 requires a value. 1>&2
+        echo Run 'helm viz --help' for usage. 1>&2
+        exit /b 1
+    )
+    echo %~2 | findstr /r "^-" >nul 2>&1
+    if !errorlevel!==0 (
+        echo Error: Flag %~1 requires a value; got another flag '%~2'. 1>&2
+        echo Run 'helm viz --help' for usage. 1>&2
+        exit /b 1
+    )
+    set "EXTRA_VALUES=%~2"
+    shift & shift & goto :parse_args
+)
+if /i "%~1"=="--url" (
+    if "%~2"=="" (
+        echo Error: Flag %~1 requires a value. 1>&2
+        echo Run 'helm viz --help' for usage. 1>&2
+        exit /b 1
+    )
+    echo %~2 | findstr /r "^-" >nul 2>&1
+    if !errorlevel!==0 (
+        echo Error: Flag %~1 requires a value; got another flag '%~2'. 1>&2
+        echo Run 'helm viz --help' for usage. 1>&2
+        exit /b 1
+    )
+    set "APP_URL=%~2"
+    shift & shift & goto :parse_args
+)
 if /i "%~1"=="--no-open" ( set "NO_OPEN=true"  & shift & goto :parse_args )
 :: Treat unknown flags as errors
 echo %~1 | findstr /r "^-" >nul 2>&1
