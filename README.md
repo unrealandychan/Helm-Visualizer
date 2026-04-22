@@ -1,3 +1,16 @@
+<div align="center">
+
+<img src="https://capsule-render.vercel.app/api?type=waving&color=gradient&customColorList=6,11,20&height=160&section=header&text=Helm--Visualizer&fontSize=38&fontColor=ffffff&fontAlignY=38&desc=Browser-based+Helm+chart+renderer+%26+K8s+resource+graph&descAlignY=58&descSize=14" alt="Header"/>
+
+[![Stars](https://img.shields.io/github/stars/unrealandychan/Helm-Visualizer?style=for-the-badge&logo=github&color=f78166&logoColor=white&labelColor=0d1117)](https://github.com/unrealandychan/Helm-Visualizer/stargazers)
+[![Forks](https://img.shields.io/github/forks/unrealandychan/Helm-Visualizer?style=for-the-badge&logo=github&color=79c0ff&logoColor=white&labelColor=0d1117)](https://github.com/unrealandychan/Helm-Visualizer/network/members)
+[![Language](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&style=for-the-badge&logoColor=white&labelColor=0d1117)](https://github.com/unrealandychan/Helm-Visualizer)
+[![Kubernetes](https://img.shields.io/badge/Kubernetes-Compatible-326CE5?style=for-the-badge&logo=kubernetes&logoColor=white&labelColor=0d1117)](https://kubernetes.io/)
+
+</div>
+
+---
+
 # Helm Chart Visualizer
 
 [![GitHub Repo](https://img.shields.io/badge/GitHub-unrealandychan%2FHelm--Visualizer-blue?logo=github)](https://github.com/unrealandychan/Helm-Visualizer)
@@ -188,7 +201,7 @@ The assistant is aware of the chart's metadata, every rendered Kubernetes resour
    ```
 2. Set your API key:
    ```
-   OPENAI_API_KEY=sk-...
+   OPENAI_API_KEY=***
    ```
 3. Restart the dev server — the chat button appears in the bottom-right corner of the UI.
 
