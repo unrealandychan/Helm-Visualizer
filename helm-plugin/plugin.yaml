@@ -1,5 +1,5 @@
 name: "viz"
-version: "0.1.0"
+version: "1.0.4"
 usage: "helm viz [CHART_DIR] [flags]"
 description: |-
   Launch the Helm Chart Visualizer web UI for a given chart directory.

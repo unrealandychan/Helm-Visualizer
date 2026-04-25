@@ -1,5 +1,11 @@
 # Release Notes
 
+## Helm Visualizer — v1.0.4 (April 24, 2026)
+
+Version bump to 1.0.4. Stability and packaging improvements following the v0.2.0 VS Code extension release.
+
+---
+
 ## Helm Visualizer — v0.2.0 (April 21, 2026)
 
 ---
