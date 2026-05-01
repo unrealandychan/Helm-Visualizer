@@ -246,10 +246,90 @@ class HelmVisualizerPanel {
     }
     #error-banner {
       display: none;
-      padding: 20px;
+      flex: 1;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
       text-align: center;
+      background: #1e1e1e;
     }
-    #error-banner a { color: #9cdcfe; }
+    #error-banner .error-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+      opacity: 0.6;
+    }
+    #error-banner h2 {
+      color: #f48771;
+      margin: 0 0 12px 0;
+      font-size: 16px;
+      font-weight: 600;
+    }
+    #error-banner p {
+      color: #aaa;
+      margin: 6px 0;
+      line-height: 1.6;
+      max-width: 520px;
+    }
+    #error-banner .setup-box {
+      margin: 18px auto;
+      padding: 14px 20px;
+      background: #252526;
+      border: 1px solid #3c3c3c;
+      border-radius: 6px;
+      text-align: left;
+      max-width: 520px;
+      width: 100%;
+    }
+    #error-banner .setup-box .step-label {
+      color: #9cdcfe;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+    #error-banner code {
+      display: block;
+      background: #1a1a1a;
+      border: 1px solid #444;
+      border-radius: 4px;
+      padding: 8px 12px;
+      margin: 6px 0;
+      color: #ce9178;
+      font-family: var(--vscode-editor-font-family, monospace);
+      font-size: 12px;
+      word-break: break-all;
+    }
+    #error-banner .url-display {
+      color: #9cdcfe;
+      font-family: var(--vscode-editor-font-family, monospace);
+      font-size: 12px;
+    }
+    #error-banner a { color: #9cdcfe; cursor: pointer; text-decoration: underline; }
+    #error-banner .actions {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      margin-top: 20px;
+      flex-wrap: wrap;
+    }
+    #error-banner .btn {
+      background: #0e639c;
+      color: #fff;
+      border: none;
+      border-radius: 3px;
+      padding: 6px 16px;
+      cursor: pointer;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    #error-banner .btn:hover { background: #1177bb; }
+    #error-banner .btn-secondary {
+      background: #3c3c3c;
+      color: #ccc;
+    }
+    #error-banner .btn-secondary:hover { background: #505050; }
   </style>
 </head>
 <body>
@@ -265,13 +345,34 @@ class HelmVisualizerPanel {
     sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-downloads"
   ></iframe>
   <div id="error-banner">
+    <div class="error-icon">⚠️</div>
+    <h2>Helm Visualizer server is not running</h2>
     <p>
-      Could not load <strong>${escapeHtml(appUrl)}</strong>.<br/>
-      Make sure the Helm Visualizer server is running:<br/>
-      <code>npm run dev</code><br/>
-      in the repository root, then reload.
+      The panel could not connect to <span class="url-display">${escapeHtml(appUrl)}</span>.
     </p>
-    <p>Or <a href="#" id="browser-link">open in your default browser</a>.</p>
+    <div class="setup-box">
+      <div class="step-label">How to start the server</div>
+      <p style="margin:4px 0 6px;color:#bbb;font-size:12px;">
+        Helm Visualizer server is not running. Start it with:
+      </p>
+      <code>cd &lt;project-dir&gt; &amp;&amp; npm run dev</code>
+      <p style="margin:8px 0 4px;color:#888;font-size:11px;">
+        then reload this panel.
+      </p>
+    </div>
+    <div class="setup-box">
+      <div class="step-label">Step-by-step</div>
+      <p style="margin:4px 0;color:#bbb;font-size:12px;">1. Open a terminal in the Helm-Visualizer project directory</p>
+      <code>cd Helm-Visualizer &amp;&amp; npm install &amp;&amp; npm run dev</code>
+      <p style="margin:8px 0 4px;color:#bbb;font-size:12px;">2. Wait for <em>ready on http://localhost:3000</em>, then click <strong>Reload</strong> above.</p>
+      <p style="margin:4px 0;color:#888;font-size:11px;">
+        Using a different port? Update <code style="display:inline;border:none;background:none;padding:0;color:#ce9178;">helmVisualizer.appUrl</code> in VS Code Settings.
+      </p>
+    </div>
+    <div class="actions">
+      <button class="btn" id="error-reload-btn">↺ Retry</button>
+      <button class="btn btn-secondary" id="error-browser-btn">Open in Browser ↗</button>
+    </div>
   </div>
   <script>
     const vscode = acquireVsCodeApi();
@@ -279,30 +380,54 @@ class HelmVisualizerPanel {
     const banner = document.getElementById('error-banner');
     const baseUrl = ${safeJsonUrl};
 
-    // Reload using a cache-busting query parameter so the iframe always
-    // re-fetches the page, regardless of same-origin restrictions.
-    document.getElementById('reload-btn').addEventListener('click', () => {
-      const sep = baseUrl.includes('?') ? '&' : '?';
-      frame.src = baseUrl + sep + '_t=' + Date.now();
+    function showError() {
+      frame.style.display = 'none';
+      banner.style.display = 'flex';
+    }
+
+    function hideError() {
       banner.style.display = 'none';
       frame.style.display = '';
-    });
+    }
+
+    // Reload using a cache-busting query parameter so the iframe always
+    // re-fetches the page, regardless of same-origin restrictions.
+    function reloadFrame() {
+      const sep = baseUrl.includes('?') ? '&' : '?';
+      frame.src = baseUrl + sep + '_t=' + Date.now();
+      hideError();
+      startLoadTimer();
+    }
+
+    document.getElementById('reload-btn').addEventListener('click', reloadFrame);
+    document.getElementById('error-reload-btn').addEventListener('click', reloadFrame);
+
     document.getElementById('browser-btn').addEventListener('click', () => {
       vscode.postMessage({ command: 'openInBrowser' });
     });
-    document.getElementById('browser-link').addEventListener('click', (e) => {
-      e.preventDefault();
+    document.getElementById('error-browser-btn').addEventListener('click', () => {
       vscode.postMessage({ command: 'openInBrowser' });
     });
 
     // The iframe 'error' event does not fire for network / HTTP failures; use a
     // timed load check instead.  If the frame fires 'load' but its content is
     // inaccessible (cross-origin or blank), we show a helpful error banner.
-    let loadTimer = setTimeout(() => {
-      // No 'load' event within 8 s — server likely not running.
-      frame.style.display = 'none';
-      banner.style.display = 'block';
-    }, 8000);
+    let loadTimer;
+
+    function startLoadTimer() {
+      clearTimeout(loadTimer);
+      loadTimer = setTimeout(() => {
+        // No 'load' event within 8 s — server likely not running.
+        // Show the full error panel with server URL and startup instructions.
+        showError();
+        console.warn(
+          '[Helm Visualizer] Could not reach ' + baseUrl + ' within 8 s. ' +
+          'Make sure the server is running: cd <project-dir> && npm run dev'
+        );
+      }, 8000);
+    }
+
+    startLoadTimer();
 
     frame.addEventListener('load', () => {
       clearTimeout(loadTimer);
@@ -317,8 +442,7 @@ class HelmVisualizerPanel {
         loaded = true; // cross-origin = loaded fine
       }
       if (!loaded) {
-        frame.style.display = 'none';
-        banner.style.display = 'block';
+        showError();
       }
     });
   </script>
@@ -338,4 +462,3 @@ function escapeHtml(str: string): string {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 }
-
