@@ -93,7 +93,15 @@ function saveHistory(entry: HistoryEntry) {
   const withTimestamp: HistoryEntry = { ...entry, savedAt: Date.now() };
   const prev = loadHistory().filter((h) => h.name !== entry.name || h.source !== entry.source);
   const next = [withTimestamp, ...prev].slice(0, MAX_HISTORY);
-  localStorage.setItem(HISTORY_KEY, JSON.stringify(next));
+
+  for (let end = next.length; end > 0; end -= 1) {
+    try {
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(next.slice(0, end)));
+      return;
+    } catch {
+      // Retry with fewer entries if storage is full/unavailable.
+    }
+  }
 }
 
 /** Count resources grouped by kind from the active environment */
