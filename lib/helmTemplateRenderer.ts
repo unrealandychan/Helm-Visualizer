@@ -275,7 +275,7 @@ export async function renderHelmChartJS(
       }
     } catch (renderErr) {
       // Skip files that fail to render (e.g. unsupported syntax)
-      if (process.env.HELM_RENDER_DEBUG) {
+      if (process.env.HELM_RENDER_DEBUG === "1" || process.env.HELM_RENDER_DEBUG === "true") {
         console.error(`[helmTemplateRenderer] render error in ${relPath}:`, renderErr);
       }
     }
