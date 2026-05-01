@@ -273,8 +273,11 @@ export async function renderHelmChartJS(
         const docs = splitRenderedDocs(rendered, name);
         parts.push(...docs);
       }
-    } catch {
+    } catch (renderErr) {
       // Skip files that fail to render (e.g. unsupported syntax)
+      if (process.env.HELM_RENDER_DEBUG === "1" || process.env.HELM_RENDER_DEBUG === "true") {
+        console.error(`[helmTemplateRenderer] render error in ${relPath}:`, renderErr);
+      }
     }
   }
 

@@ -1,28 +1,18 @@
 {
-  "name": "helm-chart-visualizer",
-  "version": "1.0.4",
+  "name": "helm-visualizer",
+  "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "next lint",
+    "test": "vitest run"
   },
   "dependencies": {
-    "@dagrejs/dagre": "^3.0.0",
-    "@xyflow/react": "^12.10.2",
-    "clsx": "^2.1.1",
-    "highlight.js": "^11.11.1",
-    "html-to-image": "^1.11.13",
-    "js-yaml": "^4.1.1",
-    "lucide-react": "^1.7.0",
     "next": "16.2.2",
-    "react": "19.2.4",
-    "react-dom": "19.2.4",
-    "react-markdown": "^10.1.0",
-    "rehype-highlight": "^7.0.2",
-    "remark-gfm": "^4.0.1",
-    "tar": "^7.5.13"
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -34,6 +24,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.2",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^2.1.9"
   }
 }

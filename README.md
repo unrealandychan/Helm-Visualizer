@@ -101,6 +101,65 @@ See [`helm-plugin/README.md`](helm-plugin/README.md) for full documentation, Win
 
 ---
 
+## Getting Started with VS Code
+
+Get up and running with the VS Code extension in four steps.
+
+### Step 1 — Start the server
+
+The extension embeds the Helm Visualizer web app inside a VS Code panel, so the server must be running first:
+
+```bash
+cd Helm-Visualizer
+npm install
+npm run dev
+```
+
+Wait until you see **ready on http://localhost:3000** in the terminal output before opening the panel.
+
+### Step 2 — Install the extension
+
+**Option A — VS Marketplace** (recommended):
+
+Search for **Helm Visualizer** in the Extensions sidebar, or visit the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=unrealandychan.helm-visualizer).
+
+**Option B — Local build:**
+
+```bash
+cd vscode-extension
+npm run install-local
+```
+
+Reload VS Code after installation (`Ctrl+Shift+P` → **Developer: Reload Window**).
+
+### Step 3 — Open the panel
+
+Open the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`) and run:
+
+> **Helm Visualizer: Open**
+
+### Step 4 — Visualize a chart
+
+The panel opens with the full Helm Visualizer UI. You can:
+
+- **Paste a chart URL** — drop in an Artifact Hub link (e.g. `https://artifacthub.io/packages/helm/bitnami/nginx`)
+- **Upload a `.tgz`** — click Upload and select a packaged Helm chart
+- **Use your workspace chart** — if your repo contains a `helm/` directory it is loaded automatically
+
+### Troubleshooting
+
+> **Blank or loading panel?** Ensure the server is running at **http://localhost:3000** (see Step 1). The panel shows a detailed error overlay with startup instructions if it cannot reach the server.
+
+### Changing the server port
+
+If you run the server on a different port, update the extension setting:
+
+1. Open **Settings** (`Ctrl+,`)
+2. Search for `helmVisualizer.appUrl`
+3. Set it to your custom URL, e.g. `http://localhost:8080`
+
+---
+
 ## VS Code Extension
 
 The Helm Visualizer is also available as a VS Code extension that embeds the web app directly inside an editor panel.
