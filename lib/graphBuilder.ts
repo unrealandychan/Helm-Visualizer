@@ -343,20 +343,83 @@ function inferEdges(resources: K8sResource[]): Edge[] {
     }
   }
 
+  function normalizeNamespace(namespace: unknown): string {
+    return typeof namespace === "string" && namespace.length > 0 ? namespace : "default";
+  }
+
+  function matchesLabelSelector(
+    selector: Record<string, unknown> | undefined,
+    labels: Record<string, string>,
+  ): boolean {
+    if (!selector) return false;
+
+    const matchLabels = selector.matchLabels as Record<string, string> | undefined;
+    const matchExpressions = selector.matchExpressions as
+      | Array<Record<string, unknown>>
+      | undefined;
+
+    const hasMatchLabels = !!matchLabels && Object.keys(matchLabels).length > 0;
+    const hasMatchExpressions = !!matchExpressions && matchExpressions.length > 0;
+    if (!hasMatchLabels && !hasMatchExpressions) return false;
+
+    const labelsMatch =
+      !hasMatchLabels ||
+      Object.entries(matchLabels).every(([k, v]) => labels[k] === v);
+
+    const expressionsMatch =
+      !hasMatchExpressions ||
+      matchExpressions.every((expression) => {
+        const key = expression.key;
+        const operator = expression.operator;
+        const values = Array.isArray(expression.values)
+          ? expression.values.filter((value): value is string => typeof value === "string")
+          : [];
+
+        if (typeof key !== "string" || typeof operator !== "string") return false;
+
+        switch (operator) {
+          case "In":
+            return key in labels && values.includes(labels[key]);
+          case "NotIn":
+            return !(key in labels) || !values.includes(labels[key]);
+          case "Exists":
+            return key in labels;
+          case "DoesNotExist":
+            return !(key in labels);
+          default:
+            return false;
+        }
+      });
+
+    return labelsMatch && expressionsMatch;
+  }
+
   // PodDisruptionBudget → Deployments via selector matching
   const pdbs = resources.filter((r) => r.kind === "PodDisruptionBudget");
   for (const pdb of pdbs) {
     const spec = pdb.spec as Record<string, unknown> | undefined;
-    const selector = (spec?.selector as Record<string, unknown> | undefined)?.matchLabels as Record<string, string> | undefined;
-    if (!selector || Object.keys(selector).length === 0) continue;
+    const selector = spec?.selector as Record<string, unknown> | undefined;
+    if (!selector) continue;
+
+    const pdbNamespace = normalizeNamespace(pdb.metadata?.namespace);
+    const hasSelectorRequirements =
+      (selector.matchLabels &&
+        Object.keys(selector.matchLabels as Record<string, unknown>).length > 0) ||
+      (Array.isArray(selector.matchExpressions) && selector.matchExpressions.length > 0);
+    if (!hasSelectorRequirements) continue;
+
     for (const dep of deployments) {
+      if (normalizeNamespace(dep.metadata?.namespace) !== pdbNamespace) continue;
+
       const depSpec = dep.spec as Record<string, unknown> | undefined;
       const template = depSpec?.template as Record<string, unknown> | undefined;
       const podMeta = template?.metadata as Record<string, unknown> | undefined;
       const podLabels = podMeta?.labels as Record<string, string> | undefined;
       if (!podLabels) continue;
-      const matches = Object.entries(selector).every(([k, v]) => podLabels[k] === v);
-      if (matches) addEdge(nodeId(pdb), nodeId(dep), "disruption budget for");
+
+      if (matchesLabelSelector(selector, podLabels)) {
+        addEdge(nodeId(pdb), nodeId(dep), "disruption budget for");
+      }
     }
   }
 
