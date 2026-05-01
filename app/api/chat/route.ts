@@ -50,17 +50,24 @@ const PROMPT_ENTRY_LIMIT = 200;
 // Server-side limits to prevent oversized or abusive requests.
 const MAX_MESSAGES = 50;
 const MAX_MESSAGE_CHARS = 4000;
+
+function getClampedEnvInt(name: string, defaultValue: number, minValue: number): number {
+  const parsed = parseInt(process.env[name] ?? "", 10);
+  if (!Number.isFinite(parsed)) return defaultValue;
+  return Math.max(minValue, parsed);
+}
+
 /** Maximum tokens the LLM may generate in a single response. Override with OPENAI_MAX_TOKENS env var. */
-const MAX_RESPONSE_TOKENS = parseInt(process.env.OPENAI_MAX_TOKENS ?? "1200", 10);
+const MAX_RESPONSE_TOKENS = getClampedEnvInt("OPENAI_MAX_TOKENS", 1200, 1);
 /** Rough token budget for the full prompt (system + history). 1 token ≈ 4 chars. */
 const MAX_PROMPT_CHARS = 60_000; // ~15k tokens — safe for gpt-4o-mini 128k context
 
 // ── In-memory rate limiter (per IP, sliding window) ──────────────────────────
 const _rateLimitMap = new Map<string, number[]>();
 /** Max requests per IP per window. */
-const RATE_LIMIT_MAX = parseInt(process.env.CHAT_RATE_LIMIT_MAX ?? "30", 10);
+const RATE_LIMIT_MAX = getClampedEnvInt("CHAT_RATE_LIMIT_MAX", 30, 1);
 /** Sliding window in milliseconds. */
-const RATE_LIMIT_WINDOW_MS = parseInt(process.env.CHAT_RATE_LIMIT_WINDOW_MS ?? "60000", 10);
+const RATE_LIMIT_WINDOW_MS = getClampedEnvInt("CHAT_RATE_LIMIT_WINDOW_MS", 60000, 1);
 
 function checkRateLimit(ip: string): boolean {
   const now = Date.now();
