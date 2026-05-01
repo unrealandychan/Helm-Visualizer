@@ -19,7 +19,57 @@ import { readFile, readdir } from "fs/promises";
 import { existsSync } from "fs";
 import path from "path";
 import yaml from "js-yaml";
+import { AsyncLocalStorage } from "async_hooks";
 
+// Per-render stub tracking. The Set-like wrapper resolves storage from the
+// current async execution context so concurrent renders do not share state.
+const _stubsInvokedThisRenderStorage = new AsyncLocalStorage<Set<string>>();
+
+function getStubsInvokedThisRenderSet(): Set<string> {
+  const current = _stubsInvokedThisRenderStorage.getStore();
+  if (current) return current;
+
+  const created = new Set<string>();
+  _stubsInvokedThisRenderStorage.enterWith(created);
+  return created;
+}
+
+const _stubsInvokedThisRender = {
+  clear(): void {
+    _stubsInvokedThisRenderStorage.enterWith(new Set<string>());
+  },
+  add(value: string) {
+    getStubsInvokedThisRenderSet().add(value);
+    return this;
+  },
+  has(value: string): boolean {
+    return getStubsInvokedThisRenderSet().has(value);
+  },
+  delete(value: string): boolean {
+    return getStubsInvokedThisRenderSet().delete(value);
+  },
+  values(): IterableIterator<string> {
+    return getStubsInvokedThisRenderSet().values();
+  },
+  keys(): IterableIterator<string> {
+    return getStubsInvokedThisRenderSet().keys();
+  },
+  entries(): IterableIterator<[string, string]> {
+    return getStubsInvokedThisRenderSet().entries();
+  },
+  forEach(
+    callbackfn: (value: string, value2: string, set: Set<string>) => void,
+    thisArg?: unknown
+  ): void {
+    getStubsInvokedThisRenderSet().forEach(callbackfn, thisArg);
+  },
+  get size(): number {
+    return getStubsInvokedThisRenderSet().size;
+  },
+  [Symbol.iterator](): IterableIterator<string> {
+    return getStubsInvokedThisRenderSet()[Symbol.iterator]();
+  },
+};
 // ─────────────────────────────────────────────────────────────
 // Public API
 // ─────────────────────────────────────────────────────────────
@@ -43,13 +93,16 @@ export interface HelmRenderContext {
 
 /**
  * Render all templates in chartDir, merging the provided values files.
- * Returns a multi-document YAML string (same format as `helm template` output).
+ * Returns a multi-document YAML string (same format as `helm template` output)
+ * and a list of stub function names that were invoked (empty if none).
  */
 export async function renderHelmChartJS(
   chartDir: string,
   releaseName: string,
   valuesFiles: string[]
-): Promise<string> {
+): Promise<{ yaml: string; stubsUsed: string[] }> {
+  // Reset stub tracking for this render run.
+  _stubsInvokedThisRender.clear();
   // 1. Load Chart.yaml
   const chartYaml = yaml.load(
     await readFile(path.join(chartDir, "Chart.yaml"), "utf-8")
@@ -174,7 +227,7 @@ export async function renderHelmChartJS(
     }
   }
 
-  return parts.join("\n");
+  return { yaml: parts.join("\n"), stubsUsed: Array.from(_stubsInvokedThisRender) };
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -791,6 +844,7 @@ function applyFunc(
     case "b64dec":
       return Buffer.from(String(args[0] ?? ""), "base64").toString("utf-8");
     case "sha256sum":
+      _stubsInvokedThisRender.add("sha256sum");
       return String(args[0] ?? ""); // stub — no crypto dep needed for rendering
 
     // ── YAML / indentation ────────────────────────────────────
@@ -1090,8 +1144,10 @@ function applyFunc(
     case "randAlpha":
     case "randNumeric":
     case "randAscii":
+      _stubsInvokedThisRender.add(fn);
       return "x".repeat(Math.max(1, Number(args[0] ?? 5)));
     case "uuidv4":
+      _stubsInvokedThisRender.add("uuidv4");
       return "00000000-0000-4000-8000-000000000000"; // deterministic stub
     case "now":
       return new Date().toISOString();

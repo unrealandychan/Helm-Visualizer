@@ -86,6 +86,8 @@ export interface EnvRenderResult {
   valuesTree: ValuesTree;
   renderedManifest?: string;
   renderError?: string;
+  /** Non-empty when the pure-JS fallback renderer was used and invoked stub functions. */
+  jsRendererWarnings?: string[];
 }
 
 // ──────────────────────────────────────────────

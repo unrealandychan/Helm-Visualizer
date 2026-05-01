@@ -11,6 +11,7 @@ import {
   useReactFlow,
   getNodesBounds,
   getViewportForBounds,
+  type Node,
   type NodeMouseHandler,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -45,8 +46,17 @@ const nodeTypes = {
   resourceNode: ResourceNode,
 };
 
-const IMAGE_WIDTH = 1920;
-const IMAGE_HEIGHT = 1080;
+const IMAGE_PADDING = 120;
+const IMAGE_MAX_DIM = 8192;
+
+function getExportDimensions(nodes: Node[]) {
+  if (nodes.length === 0) return { width: 1920, height: 1080 };
+  const bounds = getNodesBounds(nodes);
+  return {
+    width: Math.min(Math.max(Math.ceil(bounds.width) + IMAGE_PADDING * 2, 800), IMAGE_MAX_DIM),
+    height: Math.min(Math.max(Math.ceil(bounds.height) + IMAGE_PADDING * 2, 600), IMAGE_MAX_DIM),
+  };
+}
 const VIEWPORT_SELECTOR = ".react-flow__viewport";
 const THEME_VISUALS = {
   light: {
@@ -97,22 +107,23 @@ const ExportController = forwardRef<ResourceGraphHandle, ExportControllerProps>(
 
     function getExportViewport() {
       const allNodes = getNodes();
+      const { width, height } = getExportDimensions(allNodes);
       const bounds = getNodesBounds(allNodes);
-      return getViewportForBounds(bounds, IMAGE_WIDTH, IMAGE_HEIGHT, 0.05, 2, 0.1);
+      return { viewport: getViewportForBounds(bounds, width, height, 0.05, 2, 0.1), width, height };
     }
 
     useImperativeHandle(ref, () => ({
       async exportPng() {
         const el = containerRef.current?.querySelector<HTMLElement>(VIEWPORT_SELECTOR);
         if (!el) return;
-        const { x, y, zoom } = getExportViewport();
+        const { viewport: { x, y, zoom }, width, height } = getExportViewport();
         const dataUrl = await toPng(el, {
           backgroundColor: exportBackground,
-          width: IMAGE_WIDTH,
-          height: IMAGE_HEIGHT,
+          width,
+          height,
           style: {
-            width: `${IMAGE_WIDTH}px`,
-            height: `${IMAGE_HEIGHT}px`,
+            width: `${width}px`,
+            height: `${height}px`,
             transform: `translate(${x}px, ${y}px) scale(${zoom})`,
           },
         });
@@ -125,14 +136,14 @@ const ExportController = forwardRef<ResourceGraphHandle, ExportControllerProps>(
       async exportSvg() {
         const el = containerRef.current?.querySelector<HTMLElement>(VIEWPORT_SELECTOR);
         if (!el) return;
-        const { x, y, zoom } = getExportViewport();
+        const { viewport: { x, y, zoom }, width, height } = getExportViewport();
         const dataUrl = await toSvg(el, {
           backgroundColor: exportBackground,
-          width: IMAGE_WIDTH,
-          height: IMAGE_HEIGHT,
+          width,
+          height,
           style: {
-            width: `${IMAGE_WIDTH}px`,
-            height: `${IMAGE_HEIGHT}px`,
+            width: `${width}px`,
+            height: `${height}px`,
             transform: `translate(${x}px, ${y}px) scale(${zoom})`,
           },
         });
