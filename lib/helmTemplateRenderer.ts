@@ -20,6 +20,10 @@ import { existsSync } from "fs";
 import path from "path";
 import yaml from "js-yaml";
 
+// Module-level set populated by callBuiltin() when a stub function is invoked.
+// Reset at the start of each renderHelmChartJS call.
+const _stubsInvokedThisRender = new Set<string>();
+
 // ─────────────────────────────────────────────────────────────
 // Public API
 // ─────────────────────────────────────────────────────────────
@@ -43,13 +47,16 @@ export interface HelmRenderContext {
 
 /**
  * Render all templates in chartDir, merging the provided values files.
- * Returns a multi-document YAML string (same format as `helm template` output).
+ * Returns a multi-document YAML string (same format as `helm template` output)
+ * and a list of stub function names that were invoked (empty if none).
  */
 export async function renderHelmChartJS(
   chartDir: string,
   releaseName: string,
   valuesFiles: string[]
-): Promise<string> {
+): Promise<{ yaml: string; stubsUsed: string[] }> {
+  // Reset stub tracking for this render run.
+  _stubsInvokedThisRender.clear();
   // 1. Load Chart.yaml
   const chartYaml = yaml.load(
     await readFile(path.join(chartDir, "Chart.yaml"), "utf-8")
@@ -174,7 +181,7 @@ export async function renderHelmChartJS(
     }
   }
 
-  return parts.join("\n");
+  return { yaml: parts.join("\n"), stubsUsed: Array.from(_stubsInvokedThisRender) };
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -791,6 +798,7 @@ function applyFunc(
     case "b64dec":
       return Buffer.from(String(args[0] ?? ""), "base64").toString("utf-8");
     case "sha256sum":
+      _stubsInvokedThisRender.add("sha256sum");
       return String(args[0] ?? ""); // stub — no crypto dep needed for rendering
 
     // ── YAML / indentation ────────────────────────────────────
@@ -1090,8 +1098,10 @@ function applyFunc(
     case "randAlpha":
     case "randNumeric":
     case "randAscii":
+      _stubsInvokedThisRender.add(fn);
       return "x".repeat(Math.max(1, Number(args[0] ?? 5)));
     case "uuidv4":
+      _stubsInvokedThisRender.add("uuidv4");
       return "00000000-0000-4000-8000-000000000000"; // deterministic stub
     case "now":
       return new Date().toISOString();

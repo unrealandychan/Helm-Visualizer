@@ -29,6 +29,8 @@ import { analyzeChartSuggestions, applySuggestionToEnv } from "@/lib/chartSugges
 
 const HISTORY_KEY = "helm-viz-history";
 const MAX_HISTORY = 8;
+/** History entries older than this (ms) are pruned on load. */
+const HISTORY_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 const MAX_VALUES_TREE_ENTRIES_FOR_LLM = 200;
 const THEME_KEY = "helm-viz-theme";
 const THEMES = [
@@ -45,6 +47,8 @@ export interface HistoryEntry {
   source: "workspace" | "upload" | "artifacthub" | "github";
   url?: string;
   loadedAt: string;
+  /** Unix timestamp (ms) when the entry was saved. Used for TTL pruning. */
+  savedAt?: number;
   result: ChartRenderResult;
 }
 
@@ -67,15 +71,19 @@ function getEnvResult(result: ChartRenderResult | null, env: string): EnvRenderR
 
 function loadHistory(): HistoryEntry[] {
   try {
-    return JSON.parse(localStorage.getItem(HISTORY_KEY) ?? "[]");
+    const now = Date.now();
+    const all: HistoryEntry[] = JSON.parse(localStorage.getItem(HISTORY_KEY) ?? "[]");
+    // Prune entries that exceed TTL (or are legacy entries without savedAt — keep them)
+    return all.filter((h) => h.savedAt === undefined || now - h.savedAt < HISTORY_TTL_MS);
   } catch {
     return [];
   }
 }
 
 function saveHistory(entry: HistoryEntry) {
+  const withTimestamp: HistoryEntry = { ...entry, savedAt: Date.now() };
   const prev = loadHistory().filter((h) => h.name !== entry.name || h.source !== entry.source);
-  const next = [entry, ...prev].slice(0, MAX_HISTORY);
+  const next = [withTimestamp, ...prev].slice(0, MAX_HISTORY);
   localStorage.setItem(HISTORY_KEY, JSON.stringify(next));
 }
 
@@ -585,6 +593,21 @@ export default function Home() {
             >
               <X className="w-4 h-4" />
             </button>
+          </div>
+        );
+      })()}
+
+      {/* JS renderer stub warnings banner */}
+      {(() => {
+        const stubs = currentEnvResult?.jsRendererWarnings ?? [];
+        if (stubs.length === 0) return null;
+        return (
+          <div className="shrink-0 bg-sky-950/60 border-b border-sky-800/60 px-4 py-2 flex items-start gap-3">
+            <AlertTriangle className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
+            <p className="flex-1 text-sky-200 text-xs leading-snug">
+              ⚠️ This chart was rendered by the built-in JS fallback (helm CLI not found). The following functions used stub implementations and may produce inaccurate output:{" "}
+              <span className="font-mono">{stubs.join(", ")}</span>.
+            </p>
           </div>
         );
       })()}

@@ -37,7 +37,7 @@ export async function POST(request: Request) {
       tgzPath = dest;
     } else if (body.repoUrl && body.chartName) {
       // Use helm pull directly
-      assertSafeUrl(body.repoUrl);
+      await assertSafeUrl(body.repoUrl);
       if (!/^[a-zA-Z0-9_-]+$/.test(body.chartName)) {
         return NextResponse.json(
           { error: "Invalid chart name. Chart names must only contain letters, digits, hyphens, and underscores." },

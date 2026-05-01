@@ -66,14 +66,14 @@ function assertValidChartVersion(version: string): void {
  * @param releaseName  Release name passed to helm template
  * @param valuesFiles  Paths to values YAML files (-f flags)
  * @param extraArgs    Any extra args (only used when CLI is available)
- * @returns Multi-document YAML string
+ * @returns { yaml: string; jsRendererWarnings: string[] }
  */
 export async function runHelmTemplate(
   chartDir: string,
   releaseName = "release",
   valuesFiles: string[] = [],
   extraArgs: string[] = []
-): Promise<string> {
+): Promise<{ yaml: string; jsRendererWarnings: string[] }> {
   assertValidChartDir(chartDir);
 
   // Try CLI first; fall back to JS renderer if unavailable
@@ -105,12 +105,13 @@ export async function runHelmTemplate(
     if (stderr && stderr.trim()) {
       console.warn("[helmRunner] helm template stderr:", stderr.trim());
     }
-    return stdout;
+    return { yaml: stdout, jsRendererWarnings: [] };
   }
 
   // JS fallback
   console.info("[helmRunner] helm CLI not found — using built-in JS renderer");
-  return renderHelmChartJS(chartDir, releaseName, valuesFiles);
+  const { yaml, stubsUsed } = await renderHelmChartJS(chartDir, releaseName, valuesFiles);
+  return { yaml, jsRendererWarnings: stubsUsed };
 }
 
 /**

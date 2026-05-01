@@ -60,7 +60,7 @@ export async function renderChart(chartDir: string): Promise<NextResponse> {
     renderTargets.map(async ({ vf, env }) => {
       try {
         const vfArr = vf ? [vf] : [];
-        const rendered = await runHelmTemplate(chartDir, "release", vfArr);
+        const { yaml: rendered, jsRendererWarnings } = await runHelmTemplate(chartDir, "release", vfArr);
         const resources = parseMultiDocYaml(rendered);
         const valuesYaml = vf ? await readFile(vf, "utf-8") : "";
         const valuesTree = extractValuesEntries(valuesYaml, env, templateFiles);
@@ -73,6 +73,7 @@ export async function renderChart(chartDir: string): Promise<NextResponse> {
           renderedManifest: rendered,
           valuesTree,
           graph,
+          ...(jsRendererWarnings.length > 0 ? { jsRendererWarnings } : {}),
         } as EnvRenderResult & { graph: ReturnType<typeof buildGraph> };
       } catch (err) {
         return {
