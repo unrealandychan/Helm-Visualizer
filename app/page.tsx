@@ -123,6 +123,9 @@ const KIND_BADGE_COLOR: Partial<Record<K8sKind, string>> = {
   ConfigMap: "bg-teal-900 text-teal-300 border-teal-700",
   ServiceAccount: "bg-gray-700 text-gray-300 border-gray-600",
   Secret: "bg-red-900 text-red-300 border-red-700",
+  NetworkPolicy: "bg-rose-900 text-rose-300 border-rose-700",
+  PodDisruptionBudget: "bg-indigo-900 text-indigo-300 border-indigo-700",
+  CustomResourceDefinition: "bg-amber-900 text-amber-300 border-amber-700",
 };
 
 const KIND_LABEL: Partial<Record<K8sKind, string>> = {
@@ -130,6 +133,9 @@ const KIND_LABEL: Partial<Record<K8sKind, string>> = {
   HorizontalPodAutoscaler: "HPA",
   PersistentVolumeClaim: "PVC",
   ServiceAccount: "SA",
+  NetworkPolicy: "NetPol",
+  PodDisruptionBudget: "PDB",
+  CustomResourceDefinition: "CRD",
 };
 
 export default function Home() {
@@ -139,6 +145,7 @@ export default function Home() {
   const [selectedResource, setSelectedResource] = useState<ResourceNodeData | null>(null);
   const [highlightedKeys, setHighlightedKeys] = useState<string[]>([]);
   const [showLoader, setShowLoader] = useState(true);
+  const [isRendering, setIsRendering] = useState(false);
   const [valuesOpen, setValuesOpen] = useState(true);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [showDiffPanel, setShowDiffPanel] = useState(false);
@@ -169,6 +176,7 @@ export default function Home() {
 
   useEffect(() => {
     setHistory(loadHistory());
+    setIsRendering(true);
     fetch("/api/workspace-chart")
       .then((r) => r.json())
       .then((data: ChartRenderResult) => {
@@ -177,7 +185,8 @@ export default function Home() {
           setShowLoader(false);
         }
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setIsRendering(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -567,7 +576,7 @@ export default function Home() {
       {showLoader && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-zinc-950/90 backdrop-blur-sm p-6">
           <div className="w-full max-w-2xl">
-            <ChartLoader onLoad={handleChartLoad} history={history} />
+            <ChartLoader onLoad={handleChartLoad} history={history} onRenderingChange={setIsRendering} />
             {chartResult && (
               <button
                 onClick={() => setShowLoader(false)}
@@ -640,7 +649,17 @@ export default function Home() {
 
       <div className="flex flex-1 overflow-hidden">
         <div className="flex-1 relative overflow-hidden">
-          {!chartResult && !showLoader && (
+          {/* Rendering overlay — shown during workspace auto-load */}
+          {isRendering && (
+            <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-zinc-950/80 backdrop-blur-sm gap-3">
+              <svg className="w-8 h-8 text-blue-400 animate-spin" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+              </svg>
+              <p className="text-zinc-300 text-sm font-medium">Rendering chart…</p>
+            </div>
+          )}
+          {!chartResult && !showLoader && !isRendering && (
             <WelcomeScreen onLoadChart={() => setShowLoader(true)} />
           )}
           {currentEnvResult?.renderError ? (
