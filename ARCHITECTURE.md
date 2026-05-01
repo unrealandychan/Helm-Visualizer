@@ -155,7 +155,8 @@ Responsibilities:
 ```ts
 renderHelmChartJS(
   chartDir: string,
-  valuesFile?: string
+  releaseName: string,
+  valuesFiles: string[]
 ): Promise<{ yaml: string; stubsUsed: string[] }>
 ```
 
