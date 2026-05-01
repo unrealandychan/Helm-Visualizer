@@ -233,17 +233,26 @@ export async function renderHelmChartJS(
     // Load subchart Chart.yaml for metadata
     let scChartName = scName;
     let scChartVersion = "";
+    let scChartAppVersion = "";
+    let scChartDescription = "";
     const scChartYamlPath = path.join(scDir, "Chart.yaml");
     if (existsSync(scChartYamlPath)) {
       const scMeta = yaml.load(await readFile(scChartYamlPath, "utf-8")) as Record<string, unknown>;
       scChartName = String(scMeta.name ?? scName);
       scChartVersion = String(scMeta.version ?? "");
+      scChartAppVersion = String(scMeta.appVersion ?? "");
+      scChartDescription = String(scMeta.description ?? "");
     }
 
     subchartContexts.set(scName, {
       Values: scValues,
       Release: { ...ctx.Release },
-      Chart: { Name: scChartName, Version: scChartVersion, AppVersion: "", Description: "" },
+      Chart: {
+        Name: scChartName,
+        Version: scChartVersion,
+        AppVersion: scChartAppVersion,
+        Description: scChartDescription,
+      },
     });
   }
 
