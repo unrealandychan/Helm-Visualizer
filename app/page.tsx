@@ -73,8 +73,17 @@ function loadHistory(): HistoryEntry[] {
   try {
     const now = Date.now();
     const all: HistoryEntry[] = JSON.parse(localStorage.getItem(HISTORY_KEY) ?? "[]");
-    // Prune entries that exceed TTL (or are legacy entries without savedAt — keep them)
-    return all.filter((h) => h.savedAt === undefined || now - h.savedAt < HISTORY_TTL_MS);
+    // Prune entries that exceed TTL. For legacy entries without savedAt, infer it from loadedAt.
+    return all.flatMap((h) => {
+      const savedAt =
+        typeof h.savedAt === "number" && Number.isFinite(h.savedAt)
+          ? h.savedAt
+          : Date.parse(h.loadedAt);
+      if (!Number.isFinite(savedAt) || now - savedAt >= HISTORY_TTL_MS) {
+        return [];
+      }
+      return [{ ...h, savedAt }];
+    });
   } catch {
     return [];
   }
