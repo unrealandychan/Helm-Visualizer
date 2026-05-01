@@ -50,6 +50,34 @@ const PROMPT_ENTRY_LIMIT = 200;
 // Server-side limits to prevent oversized or abusive requests.
 const MAX_MESSAGES = 50;
 const MAX_MESSAGE_CHARS = 4000;
+/** Maximum tokens the LLM may generate in a single response. Override with OPENAI_MAX_TOKENS env var. */
+const MAX_RESPONSE_TOKENS = parseInt(process.env.OPENAI_MAX_TOKENS ?? "1200", 10);
+/** Rough token budget for the full prompt (system + history). 1 token ≈ 4 chars. */
+const MAX_PROMPT_CHARS = 60_000; // ~15k tokens — safe for gpt-4o-mini 128k context
+
+// ── In-memory rate limiter (per IP, sliding window) ──────────────────────────
+const _rateLimitMap = new Map<string, number[]>();
+/** Max requests per IP per window. */
+const RATE_LIMIT_MAX = parseInt(process.env.CHAT_RATE_LIMIT_MAX ?? "30", 10);
+/** Sliding window in milliseconds. */
+const RATE_LIMIT_WINDOW_MS = parseInt(process.env.CHAT_RATE_LIMIT_WINDOW_MS ?? "60000", 10);
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const windowStart = now - RATE_LIMIT_WINDOW_MS;
+  const timestamps = (_rateLimitMap.get(ip) ?? []).filter((t) => t > windowStart);
+  if (timestamps.length >= RATE_LIMIT_MAX) return false;
+  timestamps.push(now);
+  _rateLimitMap.set(ip, timestamps);
+  // Prevent unbounded map growth: prune IPs not seen for 10 minutes
+  if (_rateLimitMap.size > 10_000) {
+    for (const [key, ts] of _rateLimitMap) {
+      if (ts[ts.length - 1] < now - 10 * 60_000) _rateLimitMap.delete(key);
+    }
+  }
+  return true;
+}
+
 
 function buildSystemPrompt(chartContext: MinimalChartContext | null, activeEnv: string): string {
   if (!chartContext) {
@@ -142,6 +170,18 @@ function buildSystemPrompt(chartContext: MinimalChartContext | null, activeEnv: 
 }
 
 export async function POST(request: Request) {
+  // ── Rate limiting ────────────────────────────────────────────
+  const ip =
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+    request.headers.get("x-real-ip") ??
+    "unknown";
+  if (!checkRateLimit(ip)) {
+    return NextResponse.json(
+      { error: `Rate limit exceeded. Maximum ${RATE_LIMIT_MAX} requests per ${RATE_LIMIT_WINDOW_MS / 1000}s.` },
+      { status: 429 }
+    );
+  }
+
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     return NextResponse.json(
@@ -190,6 +230,18 @@ export async function POST(request: Request) {
     ...messages.map((m) => ({ role: m.role, content: m.content })),
   ];
 
+  // ── Prompt size guard ─────────────────────────────────────────
+  const totalChars = openaiMessages.reduce((sum, m) => sum + m.content.length, 0);
+  if (totalChars > MAX_PROMPT_CHARS) {
+    return NextResponse.json(
+      {
+        error: `Chart context is too large to send to the LLM (${totalChars.toLocaleString()} chars, limit ${MAX_PROMPT_CHARS.toLocaleString()}). ` +
+          "Try loading a smaller chart or reducing the number of environments.",
+      },
+      { status: 413 }
+    );
+  }
+
   let upstream: Response;
   try {
     upstream = await fetch(`${baseUrl}/chat/completions`, {
@@ -198,7 +250,7 @@ export async function POST(request: Request) {
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,
       },
-      body: JSON.stringify({ model, messages: openaiMessages, stream: true }),
+      body: JSON.stringify({ model, messages: openaiMessages, stream: true, max_tokens: MAX_RESPONSE_TOKENS }),
       signal: request.signal,
     });
   } catch (err) {

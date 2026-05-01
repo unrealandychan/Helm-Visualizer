@@ -27,9 +27,11 @@ const POPULAR_CHARTS = [
 interface ChartLoaderProps {
   onLoad: (result: ChartRenderResult, source: "workspace" | "upload" | "artifacthub" | "github", url?: string) => void;
   history?: HistoryEntry[];
+  /** Called with true when a fetch starts, false when it ends — allows parent to show a rendering overlay. */
+  onRenderingChange?: (rendering: boolean) => void;
 }
 
-export function ChartLoader({ onLoad, history = [] }: ChartLoaderProps) {
+export function ChartLoader({ onLoad, history = [], onRenderingChange }: ChartLoaderProps) {
   const [activeTab, setActiveTab] = useState<Tab>(history.length > 0 ? "history" : "workspace");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -168,6 +170,7 @@ export function ChartLoader({ onLoad, history = [] }: ChartLoaderProps) {
 
   async function fetchWithLoading(fn: () => Promise<Response>, source: "workspace" | "upload" | "artifacthub" | "github", url?: string) {
     setLoading(true);
+    onRenderingChange?.(true);
     setError(null);
     setValidationIssues([]);
 
@@ -201,6 +204,7 @@ export function ChartLoader({ onLoad, history = [] }: ChartLoaderProps) {
       setError(e instanceof Error ? e.message : "Request failed");
     } finally {
       setLoading(false);
+      onRenderingChange?.(false);
       // Brief delay so the user sees the completed bar before it disappears
       const PROGRESS_COMPLETION_DELAY_MS = 600;
       setTimeout(() => setProgressStep(-1), PROGRESS_COMPLETION_DELAY_MS);

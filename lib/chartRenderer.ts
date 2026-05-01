@@ -15,6 +15,27 @@ export function extractEnvName(valuesFilePath: string): string {
   return parts.length > 1 ? parts[parts.length - 1] : "default";
 }
 
+/** Run tasks with bounded concurrency. */
+async function runWithConcurrency<T>(
+  tasks: Array<() => Promise<T>>,
+  concurrency: number
+): Promise<T[]> {
+  const results: T[] = new Array(tasks.length);
+  let nextIdx = 0;
+  async function worker() {
+    while (nextIdx < tasks.length) {
+      const i = nextIdx++;
+      results[i] = await tasks[i]();
+    }
+  }
+  const workers = Array.from({ length: Math.min(concurrency, tasks.length) }, worker);
+  await Promise.all(workers);
+  return results;
+}
+
+/** Maximum number of environments rendered concurrently. */
+const RENDER_CONCURRENCY = 3;
+
 export async function renderChart(chartDir: string): Promise<NextResponse> {
   // Run structural validation first — returns actionable errors/warnings
   const validation = await validateChart(chartDir);
@@ -56,8 +77,8 @@ export async function renderChart(chartDir: string): Promise<NextResponse> {
       ? valuesFiles.map((vf) => ({ vf, env: extractEnvName(vf) }))
       : [{ vf: undefined as string | undefined, env: "default" }];
 
-  const environments: EnvRenderResult[] = await Promise.all(
-    renderTargets.map(async ({ vf, env }) => {
+  const environments: EnvRenderResult[] = await runWithConcurrency(
+    renderTargets.map(({ vf, env }) => async () => {
       try {
         const vfArr = vf ? [vf] : [];
         const { yaml: rendered, jsRendererWarnings } = await runHelmTemplate(chartDir, "release", vfArr);
@@ -84,7 +105,8 @@ export async function renderChart(chartDir: string): Promise<NextResponse> {
           renderError: err instanceof Error ? err.message : String(err),
         } as EnvRenderResult;
       }
-    })
+    }),
+    RENDER_CONCURRENCY
   );
 
   return NextResponse.json({

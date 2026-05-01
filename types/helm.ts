@@ -111,6 +111,9 @@ export type K8sKind =
   | "ClusterRoleBinding"
   | "Role"
   | "RoleBinding"
+  | "NetworkPolicy"
+  | "PodDisruptionBudget"
+  | "CustomResourceDefinition"
   | "Unknown";
 
 export interface ResourceNodeData extends Record<string, unknown> {

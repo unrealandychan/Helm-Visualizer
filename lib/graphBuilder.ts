@@ -30,6 +30,9 @@ const KNOWN_KINDS: Set<string> = new Set([
   "ClusterRoleBinding",
   "Role",
   "RoleBinding",
+  "NetworkPolicy",
+  "PodDisruptionBudget",
+  "CustomResourceDefinition",
 ]);
 
 function classifyKind(kind: string): K8sKind {
@@ -319,6 +322,41 @@ function inferEdges(resources: K8sResource[]): Edge[] {
         const sec = secretsByName.get(secName);
         if (sec) addEdge(nodeId(sec), nodeId(workload), "mounted by");
       }
+    }
+  }
+
+  // NetworkPolicy → Deployments via pod selector matching
+  const networkPolicies = resources.filter((r) => r.kind === "NetworkPolicy");
+  for (const np of networkPolicies) {
+    const spec = np.spec as Record<string, unknown> | undefined;
+    const podSelector = spec?.podSelector as Record<string, unknown> | undefined;
+    const matchLabels = podSelector?.matchLabels as Record<string, string> | undefined;
+    if (!matchLabels || Object.keys(matchLabels).length === 0) continue;
+    for (const dep of deployments) {
+      const depSpec = dep.spec as Record<string, unknown> | undefined;
+      const template = depSpec?.template as Record<string, unknown> | undefined;
+      const podMeta = template?.metadata as Record<string, unknown> | undefined;
+      const podLabels = podMeta?.labels as Record<string, string> | undefined;
+      if (!podLabels) continue;
+      const matches = Object.entries(matchLabels).every(([k, v]) => podLabels[k] === v);
+      if (matches) addEdge(nodeId(np), nodeId(dep), "selects pods");
+    }
+  }
+
+  // PodDisruptionBudget → Deployments via selector matching
+  const pdbs = resources.filter((r) => r.kind === "PodDisruptionBudget");
+  for (const pdb of pdbs) {
+    const spec = pdb.spec as Record<string, unknown> | undefined;
+    const selector = (spec?.selector as Record<string, unknown> | undefined)?.matchLabels as Record<string, string> | undefined;
+    if (!selector || Object.keys(selector).length === 0) continue;
+    for (const dep of deployments) {
+      const depSpec = dep.spec as Record<string, unknown> | undefined;
+      const template = depSpec?.template as Record<string, unknown> | undefined;
+      const podMeta = template?.metadata as Record<string, unknown> | undefined;
+      const podLabels = podMeta?.labels as Record<string, string> | undefined;
+      if (!podLabels) continue;
+      const matches = Object.entries(selector).every(([k, v]) => podLabels[k] === v);
+      if (matches) addEdge(nodeId(pdb), nodeId(dep), "disruption budget for");
     }
   }
 

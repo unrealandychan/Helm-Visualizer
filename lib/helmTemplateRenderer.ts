@@ -144,7 +144,7 @@ export async function renderHelmChartJS(
 
   // 4. Load all templates, collect {{ define }} blocks first
   const templatesDir = path.join(chartDir, "templates");
-  if (!existsSync(templatesDir)) return "";
+  if (!existsSync(templatesDir)) return { yaml: "", stubsUsed: [] };
 
   // Recursively collect all template files under a directory
   async function collectTemplateFiles(
@@ -203,22 +203,64 @@ export async function renderHelmChartJS(
     }
   }
 
-  // Second pass: render main-chart .yaml files only (skip subcharts and .tpl helpers)
+  // Second pass: render all .yaml templates (main chart + subcharts)
   const parts: string[] = [];
+
+  // Group template sources by origin (main chart vs subchart)
+  // relPath format for subcharts: "charts/<subchart>/templates/<file>"
+  const subchartNames = new Set<string>();
+  for (const { relPath } of templateSources) {
+    const m = relPath.match(/^charts\/([^/]+)\//);
+    if (m) subchartNames.add(m[1]);
+  }
+
+  // Build per-subchart render context (parent Values.<subchartName> as subchart Values)
+  const subchartContexts = new Map<string, HelmRenderContext>();
+  for (const scName of subchartNames) {
+    const scDir = path.join(chartsDir, scName);
+    let scValues: Record<string, unknown> = {};
+    const scDefaultValues = path.join(scDir, "values.yaml");
+    if (existsSync(scDefaultValues)) {
+      scValues = deepMerge(
+        scValues,
+        (yaml.load(await readFile(scDefaultValues, "utf-8")) as Record<string, unknown>) ?? {}
+      );
+    }
+    // Parent values override subchart defaults (Helm scoping)
+    const parentOverrides = (mergedValues[scName] ?? {}) as Record<string, unknown>;
+    scValues = deepMerge(scValues, parentOverrides);
+
+    // Load subchart Chart.yaml for metadata
+    let scChartName = scName;
+    let scChartVersion = "";
+    const scChartYamlPath = path.join(scDir, "Chart.yaml");
+    if (existsSync(scChartYamlPath)) {
+      const scMeta = yaml.load(await readFile(scChartYamlPath, "utf-8")) as Record<string, unknown>;
+      scChartName = String(scMeta.name ?? scName);
+      scChartVersion = String(scMeta.version ?? "");
+    }
+
+    subchartContexts.set(scName, {
+      Values: scValues,
+      Release: { ...ctx.Release },
+      Chart: { Name: scChartName, Version: scChartVersion, AppVersion: "", Description: "" },
+    });
+  }
+
   for (const { name, relPath, src } of templateSources) {
-    // Only render top-level chart templates (not from subcharts/charts/)
-    if (relPath.startsWith("charts/")) continue;
     if (name.endsWith(".tpl")) continue; // helpers-only files
     if (name === "NOTES.txt") continue;  // informational only
+
+    // Determine context: main chart or subchart
+    const scMatch = relPath.match(/^charts\/([^/]+)\//);
+    const renderCtx = scMatch ? (subchartContexts.get(scMatch[1]) ?? ctx) : ctx;
+
     try {
       const tokens = tokenize(src);
       const ast = parse(tokens);
-      // Seed $ with root context so $.Values.x works inside range/with
-      const initialScope: EvalScope = new Map([["$", ctx]]);
-      const rendered = evaluate(ast, ctx, namedTemplates, initialScope).trim();
+      const initialScope: EvalScope = new Map([["$", renderCtx]]);
+      const rendered = evaluate(ast, renderCtx, namedTemplates, initialScope).trim();
       if (rendered) {
-        // A single template file can produce multiple K8s resources.
-        // Split them into separate --- documents.
         const docs = splitRenderedDocs(rendered, name);
         parts.push(...docs);
       }
