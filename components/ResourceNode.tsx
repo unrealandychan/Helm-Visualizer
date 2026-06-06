@@ -47,16 +47,30 @@ export const ResourceNode = memo(function ResourceNode({ data, selected }: Resou
     ? "medium"
     : "low";
 
+  // Determine border style
+  let borderStyle = cfg.border;
+  if (data.syncStatus) {
+    if (data.syncStatus === "in-sync") {
+      borderStyle = "border-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.2)]";
+    } else if (data.syncStatus === "out-of-sync") {
+      borderStyle = "border-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.2)] animate-pulse";
+    } else if (data.syncStatus === "local-only") {
+      borderStyle = "border-dashed border-zinc-600";
+    } else if (data.syncStatus === "orphaned") {
+      borderStyle = "border-dashed border-red-500 animate-pulse";
+    }
+  } else if (violationsCount > 0) {
+    borderStyle = highestSeverity === "high"
+      ? "border-red-600 shadow-red-950/20"
+      : "border-yellow-600 shadow-yellow-950/20";
+  }
+
   return (
     <div
       className={clsx(
         "relative rounded-lg border-2 px-3 py-2 shadow-lg min-w-[200px]",
         cfg.bg,
-        violationsCount > 0
-          ? highestSeverity === "high"
-            ? "border-red-600 shadow-red-950/20"
-            : "border-yellow-600 shadow-yellow-950/20"
-          : cfg.border,
+        borderStyle,
         selected && "ring-2 ring-white ring-offset-1 ring-offset-zinc-900",
         data.highlighted && "ring-2 ring-amber-400 ring-offset-1 ring-offset-zinc-900"
       )}
@@ -85,11 +99,35 @@ export const ResourceNode = memo(function ResourceNode({ data, selected }: Resou
       </div>
 
       {/* Values used badge */}
-      {data.valuesUsed.length > 0 && (
+      {(data.valuesUsed.length > 0 || data.syncStatus) && (
         <div className="mt-1.5 flex flex-wrap gap-1">
-          <span className="text-[9px] bg-zinc-700 text-zinc-300 rounded px-1 py-0.5">
-            {data.valuesUsed.length} values
-          </span>
+          {data.valuesUsed.length > 0 && (
+            <span className="text-[9px] bg-zinc-700 text-zinc-300 rounded px-1 py-0.5">
+              {data.valuesUsed.length} values
+            </span>
+          )}
+          {data.syncStatus && (
+            <span
+              className={clsx(
+                "text-[8px] rounded px-1 py-0.5 font-bold uppercase tracking-wide",
+                data.syncStatus === "in-sync"
+                  ? "bg-emerald-950/60 text-emerald-400 border border-emerald-800/40"
+                  : data.syncStatus === "out-of-sync"
+                  ? "bg-amber-950/60 text-amber-400 border border-amber-800/40"
+                  : data.syncStatus === "local-only"
+                  ? "bg-zinc-800 text-zinc-400 border border-zinc-700"
+                  : "bg-red-950/60 text-red-400 border border-red-800/40"
+              )}
+            >
+              {data.syncStatus === "in-sync"
+                ? "● Live Sync"
+                : data.syncStatus === "out-of-sync"
+                ? "▲ Diff Detected"
+                : data.syncStatus === "local-only"
+                ? "○ Local Only"
+                : "✖ Orphaned"}
+            </span>
+          )}
         </div>
       )}
 

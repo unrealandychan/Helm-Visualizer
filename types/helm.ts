@@ -133,6 +133,8 @@ export interface ResourceNodeData extends Record<string, unknown> {
   valuesUsed: string[];
   highlighted?: boolean;
   violations?: SecurityViolation[];
+  syncStatus?: "in-sync" | "out-of-sync" | "local-only" | "orphaned";
+  liveYaml?: string | null;
 }
 
 export interface ResourceGraphNode {

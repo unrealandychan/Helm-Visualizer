@@ -11,7 +11,7 @@ import { EnvDiffPanel } from "@/components/EnvDiffPanel";
 import { WelcomeScreen } from "@/components/WelcomeScreen";
 import { ChatBot } from "@/components/ChatBot";
 import { SuggestionsPanel } from "@/components/SuggestionsPanel";
-import { LayoutGrid, GitBranch, ChevronUp, ChevronDown, Download, AlertTriangle, Layers, FileImage, FileJson, FileText, Image as ImageIcon, X, Menu } from "lucide-react";
+import { LayoutGrid, GitBranch, ChevronUp, ChevronDown, Download, AlertTriangle, Layers, FileImage, FileJson, FileText, Image as ImageIcon, X, Menu, RefreshCw } from "lucide-react";
 import yaml from "js-yaml";
 import type {
   ChartRenderResult,
@@ -26,6 +26,7 @@ import { computeValuesDiff } from "@/lib/valueDiff";
 import { exportGraphAsJson, exportGraphAsMarkdown, triggerDownload } from "@/lib/graphExport";
 import type { ResourceGraphHandle } from "@/components/ResourceGraph";
 import { analyzeChartSuggestions, applySuggestionToEnv } from "@/lib/chartSuggestions";
+import type { ClusterDiffResult } from "@/lib/clusterDiffer";
 
 const HISTORY_KEY = "helm-viz-history";
 const MAX_HISTORY = 8;
@@ -161,6 +162,73 @@ export default function Home() {
   const [activeKindFilters, setActiveKindFilters] = useState<Set<string>>(new Set());
   const graphRef = useRef<ResourceGraphHandle>(null);
   const burgerMenuRef = useRef<HTMLDivElement>(null);
+
+  // Live Cluster Diff state
+  const [clusterDiffs, setClusterDiffs] = useState<ClusterDiffResult[]>([]);
+  const [isClusterDiffActive, setIsClusterDiffActive] = useState<boolean>(false);
+  const [clusterNamespace, setClusterNamespace] = useState<string>("default");
+  const [isClusterDiffLoading, setIsClusterDiffLoading] = useState<boolean>(false);
+  const [clusterDiffError, setClusterDiffError] = useState<string | null>(null);
+
+  async function handleToggleClusterDiff() {
+    if (isClusterDiffActive) {
+      setIsClusterDiffActive(false);
+      setClusterDiffs([]);
+      return;
+    }
+
+    if (!currentEnvResult || !currentEnvResult.resources || currentEnvResult.resources.length === 0) {
+      setClusterDiffError("No rendered resources to diff.");
+      return;
+    }
+
+    setIsClusterDiffLoading(true);
+    setClusterDiffError(null);
+
+    try {
+      const res = await fetch("/api/cluster-diff", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          resources: currentEnvResult.resources,
+          namespace: clusterNamespace,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        throw new Error(data.error || "Failed to fetch cluster status.");
+      }
+
+      setClusterDiffs(data.diffs || []);
+      setIsClusterDiffActive(true);
+    } catch (err) {
+      setClusterDiffError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIsClusterDiffLoading(false);
+    }
+  }
+
+  // Update selectedResource if clusterDiffs change
+  useEffect(() => {
+    setSelectedResource((prev) => {
+      if (!prev) return null;
+      const baseId = `${prev.resource.kind}/${prev.resource.metadata?.name}`;
+      const diff = clusterDiffs.find((d) => d.baseId === baseId);
+      if (diff) {
+        return {
+          ...prev,
+          syncStatus: diff.syncStatus,
+          liveYaml: diff.liveYaml,
+        };
+      } else {
+        const rest = { ...prev };
+        delete rest.syncStatus;
+        delete rest.liveYaml;
+        return rest;
+      }
+    });
+  }, [clusterDiffs]);
 
   // Close burger menu when clicking outside
   useEffect(() => {
@@ -298,6 +366,28 @@ export default function Home() {
     () => diffNodes.length > 0 ? diffNodes : (currentGraph?.nodes ?? []),
     [diffNodes, currentGraph?.nodes]
   );
+
+  const augmentedVisibleNodes = useMemo(() => {
+    if (!isClusterDiffActive || clusterDiffs.length === 0) return visibleNodes;
+
+    const diffMap = new Map(clusterDiffs.map((d) => [d.baseId, d]));
+
+    return visibleNodes.map((node) => {
+      const baseId = node.id.split("-")[0];
+      const diff = diffMap.get(baseId);
+      if (!diff) return node;
+
+      return {
+        ...node,
+        data: {
+          ...node.data,
+          syncStatus: diff.syncStatus,
+          liveYaml: diff.liveYaml,
+        },
+      };
+    });
+  }, [visibleNodes, isClusterDiffActive, clusterDiffs]);
+
   const visibleEdges = useMemo(
     () => currentGraph?.edges ?? [],
     [currentGraph?.edges]
@@ -305,9 +395,9 @@ export default function Home() {
 
   // Apply kind filter on top of visible nodes/edges
   const filteredNodes = useMemo(() => {
-    if (activeKindFilters.size === 0) return visibleNodes;
-    return visibleNodes.filter((n) => activeKindFilters.has(n.data.kind));
-  }, [visibleNodes, activeKindFilters]);
+    if (activeKindFilters.size === 0) return augmentedVisibleNodes;
+    return augmentedVisibleNodes.filter((n) => activeKindFilters.has(n.data.kind));
+  }, [augmentedVisibleNodes, activeKindFilters]);
 
   const filteredEdges = useMemo(() => {
     if (activeKindFilters.size === 0) return visibleEdges;
@@ -454,6 +544,51 @@ export default function Home() {
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          {chartResult && (
+            <div className="flex items-center gap-2">
+              {clusterDiffError && (
+                <div
+                  className="flex items-center gap-1.5 text-xs text-rose-400 bg-rose-950/40 border border-rose-900 px-2.5 py-1.5 rounded-lg"
+                  title={clusterDiffError}
+                >
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                  <span className="max-w-[120px] truncate">{clusterDiffError}</span>
+                  <button
+                    onClick={() => setClusterDiffError(null)}
+                    className="hover:text-rose-200 ml-1 text-[10px]"
+                    aria-label="Dismiss error"
+                  >
+                    <X className="w-2.5 h-2.5" />
+                  </button>
+                </div>
+              )}
+              <div className="flex items-center gap-1.5 bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1">
+                <span className="text-[10px] text-zinc-400 font-bold uppercase select-none tracking-wider">NS:</span>
+                <input
+                  type="text"
+                  value={clusterNamespace}
+                  onChange={(e) => setClusterNamespace(e.target.value)}
+                  placeholder="namespace"
+                  className="bg-transparent text-xs text-zinc-200 placeholder-zinc-500 w-24 focus:outline-none border-none p-0 focus:ring-0"
+                  title="Target Kubernetes Namespace for Live Diff"
+                  aria-label="Kubernetes Namespace"
+                />
+              </div>
+              <button
+                onClick={handleToggleClusterDiff}
+                disabled={isClusterDiffLoading}
+                className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-medium border transition-all ${
+                  isClusterDiffActive
+                    ? "bg-emerald-950/60 border-emerald-500/50 text-emerald-300 hover:bg-emerald-900/80 hover:text-emerald-200"
+                    : "bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700/80"
+                }`}
+                title="Compare local Helm templates with live cluster resources"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isClusterDiffLoading ? "animate-spin text-emerald-400" : isClusterDiffActive ? "text-emerald-400" : ""}`} />
+                {isClusterDiffLoading ? "Diffing…" : isClusterDiffActive ? "Live Diff Active" : "Live Cluster Diff"}
+              </button>
+            </div>
+          )}
           <button
             onClick={() => setShowLoader((v) => !v)}
             className="flex items-center gap-1.5 text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-3 py-1.5 rounded-lg transition-colors"
