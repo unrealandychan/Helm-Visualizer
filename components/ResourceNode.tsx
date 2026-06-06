@@ -3,6 +3,7 @@
 import { memo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import clsx from "clsx";
+import { AlertTriangle } from "lucide-react";
 import type { ResourceNodeData, K8sKind } from "@/types/helm";
 
 // ── kind → visual config ──────────────────────────────────────────
@@ -38,13 +39,24 @@ type ResourceNodeProps = NodeProps & {
 
 export const ResourceNode = memo(function ResourceNode({ data, selected }: ResourceNodeProps) {
   const cfg = KIND_CONFIG[data.kind] ?? KIND_CONFIG["Unknown"];
+  const showGpu = hasGpu(data);
+  const violationsCount = data.violations?.length ?? 0;
+  const highestSeverity = data.violations?.some((v) => v.severity === "high")
+    ? "high"
+    : data.violations?.some((v) => v.severity === "medium")
+    ? "medium"
+    : "low";
 
   return (
     <div
       className={clsx(
         "relative rounded-lg border-2 px-3 py-2 shadow-lg min-w-[200px]",
         cfg.bg,
-        cfg.border,
+        violationsCount > 0
+          ? highestSeverity === "high"
+            ? "border-red-600 shadow-red-950/20"
+            : "border-yellow-600 shadow-yellow-950/20"
+          : cfg.border,
         selected && "ring-2 ring-white ring-offset-1 ring-offset-zinc-900",
         data.highlighted && "ring-2 ring-amber-400 ring-offset-1 ring-offset-zinc-900"
       )}
@@ -81,8 +93,27 @@ export const ResourceNode = memo(function ResourceNode({ data, selected }: Resou
         </div>
       )}
 
+      {/* Security Violations Badge */}
+      {violationsCount > 0 && (
+        <div
+          className={clsx(
+            "absolute top-1 flex items-center gap-0.5 rounded px-1 py-0.5 text-[8px] font-bold border",
+            highestSeverity === "high"
+              ? "bg-red-950 text-red-300 border-red-700 animate-pulse"
+              : highestSeverity === "medium"
+              ? "bg-yellow-950 text-yellow-300 border-yellow-700"
+              : "bg-blue-950 text-blue-300 border-blue-700",
+            showGpu ? "right-10" : "right-1"
+          )}
+          title={`${violationsCount} security/best-practice violations`}
+        >
+          <AlertTriangle className="w-2 h-2" />
+          <span>{violationsCount}</span>
+        </div>
+      )}
+
       {/* GPU badge */}
-      {hasGpu(data) && (
+      {showGpu && (
         <span className="absolute top-1 right-1 text-[9px] bg-emerald-700 text-emerald-100 rounded px-1">
           GPU
         </span>

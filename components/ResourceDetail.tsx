@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { X, FileText, Variable } from "lucide-react";
+import { X, FileText, Variable, Shield, ShieldCheck } from "lucide-react";
 import clsx from "clsx";
 import type { ResourceNodeData } from "@/types/helm";
 
@@ -10,7 +10,7 @@ interface ResourceDetailProps {
   onClose: () => void;
 }
 
-type ActiveTab = "yaml" | "values";
+type ActiveTab = "yaml" | "values" | "security";
 
 export function ResourceDetail({ data, onClose }: ResourceDetailProps) {
   const [activeTab, setActiveTab] = useState<ActiveTab>("yaml");
@@ -59,6 +59,12 @@ export function ResourceDetail({ data, onClose }: ResourceDetailProps) {
               onClick={() => setActiveTab("values")}
             />
           )}
+          <TabLabel
+            icon={<Shield className="w-3 h-3" />}
+            label={data.violations && data.violations.length > 0 ? `Security (${data.violations.length})` : "Security"}
+            active={activeTab === "security"}
+            onClick={() => setActiveTab("security")}
+          />
         </div>
 
         {activeTab === "yaml" && (
@@ -97,6 +103,68 @@ export function ResourceDetail({ data, onClose }: ResourceDetailProps) {
                     className="text-[11px] bg-amber-900/20 border border-amber-800/40 text-amber-300 rounded px-2 py-1 font-mono"
                   >
                     .Values.{v}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === "security" && (
+          <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
+            <div className="text-[10px] uppercase text-zinc-500 font-semibold tracking-wider shrink-0">
+              Security & Best Practices
+            </div>
+
+            {!data.violations || data.violations.length === 0 ? (
+              <div className="flex flex-col items-center justify-center p-6 bg-emerald-950/20 border border-emerald-800/30 rounded-lg text-center gap-2 my-4">
+                <ShieldCheck className="w-8 h-8 text-emerald-400" />
+                <div>
+                  <h4 className="text-emerald-300 text-xs font-semibold">No Violations Found</h4>
+                  <p className="text-zinc-400 text-[10px] mt-1 max-w-[200px] mx-auto leading-relaxed">
+                    This resource complies with all built-in security and reliability best practices.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {data.violations.map((v, i) => (
+                  <div
+                    key={`${v.id}-${i}`}
+                    className={clsx(
+                      "p-3 rounded-lg border flex flex-col gap-1.5",
+                      v.severity === "high"
+                        ? "bg-red-950/10 border-red-900/40"
+                        : v.severity === "medium"
+                        ? "bg-yellow-950/10 border-yellow-900/40"
+                        : "bg-blue-950/10 border-blue-900/40"
+                    )}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span
+                        className={clsx(
+                          "text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider font-mono",
+                          v.severity === "high"
+                            ? "bg-red-900 text-red-200"
+                            : v.severity === "medium"
+                            ? "bg-yellow-900 text-yellow-200"
+                            : "bg-blue-900 text-blue-200"
+                        )}
+                      >
+                        {v.severity}
+                      </span>
+                      <span className="text-[10px] text-zinc-500 font-semibold uppercase">{v.category}</span>
+                    </div>
+
+                    <h4 className="text-zinc-100 text-xs font-bold leading-snug">{v.ruleName}</h4>
+                    <p className="text-zinc-300 text-[11px] leading-relaxed">{v.message}</p>
+
+                    <div className="mt-1 pt-1.5 border-t border-zinc-800/50">
+                      <div className="text-[9px] text-zinc-500 uppercase font-semibold">Suggested Fix</div>
+                      <p className="text-amber-400/90 text-[10px] leading-relaxed font-mono mt-0.5 bg-zinc-950/40 p-1.5 rounded border border-zinc-800/30">
+                        {v.fixSuggestion}
+                      </p>
+                    </div>
                   </div>
                 ))}
               </div>

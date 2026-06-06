@@ -116,6 +116,15 @@ export type K8sKind =
   | "CustomResourceDefinition"
   | "Unknown";
 
+export interface SecurityViolation {
+  id: string;
+  ruleName: string;
+  category: "Security" | "Reliability" | "Performance" | "Best Practice";
+  severity: "high" | "medium" | "low";
+  message: string;
+  fixSuggestion: string;
+}
+
 export interface ResourceNodeData extends Record<string, unknown> {
   resource: K8sResource;
   kind: K8sKind;
@@ -123,6 +132,7 @@ export interface ResourceNodeData extends Record<string, unknown> {
   namespace?: string;
   valuesUsed: string[];
   highlighted?: boolean;
+  violations?: SecurityViolation[];
 }
 
 export interface ResourceGraphNode {

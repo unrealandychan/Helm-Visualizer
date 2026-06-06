@@ -8,6 +8,7 @@ import type {
   ResourceNodeData,
 } from "@/types/helm";
 import { extractTemplateValueRefs } from "./yamlParser";
+import { scanResource } from "./securityScanner";
 
 // ──────────────────────────────────────────────
 // Kind classification
@@ -525,6 +526,7 @@ export function buildGraph(
       const id = count === 0 ? baseId : `${baseId}-${count}`;
 
       const kind = classifyKind(resource.kind);
+      const violations = scanResource(resource);
 
       const nodeData: ResourceNodeData = {
         resource,
@@ -532,6 +534,7 @@ export function buildGraph(
         label: resource.metadata.name,
         namespace: resource.metadata.namespace,
         valuesUsed: valueRefMap.get(baseId) ?? [],
+        violations: violations.length > 0 ? violations : undefined,
       };
 
       return {
