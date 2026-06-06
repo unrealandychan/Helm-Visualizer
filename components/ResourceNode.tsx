@@ -26,6 +26,9 @@ const KIND_CONFIG: Record<
   ClusterRoleBinding:       { bg: "bg-pink-900",   border: "border-pink-500",   text: "text-pink-200",   iconChar: "🔗", label: "CRB" },
   Role:                     { bg: "bg-fuchsia-950", border: "border-fuchsia-600", text: "text-fuchsia-300", iconChar: "🛡", label: "Role" },
   RoleBinding:              { bg: "bg-fuchsia-900", border: "border-fuchsia-500", text: "text-fuchsia-200", iconChar: "🔗", label: "RoleBinding" },
+  NetworkPolicy:            { bg: "bg-emerald-950", border: "border-emerald-600", text: "text-emerald-300", iconChar: "🌐", label: "NetPol" },
+  PodDisruptionBudget:      { bg: "bg-rose-950", border: "border-rose-600", text: "text-rose-300", iconChar: "🛑", label: "PDB" },
+  CustomResourceDefinition: { bg: "bg-cyan-950", border: "border-cyan-600", text: "text-cyan-300", iconChar: "🧩", label: "CRD" },
   Unknown:                  { bg: "bg-zinc-800",   border: "border-zinc-500",   text: "text-zinc-300",   iconChar: "?", label: "Resource" },
 };
 

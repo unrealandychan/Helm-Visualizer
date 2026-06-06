@@ -1198,7 +1198,7 @@ function applyFunc(
     case "randAlpha":
     case "randNumeric":
     case "randAscii":
-      _stubsInvokedThisRender.add(fn);
+      _stubsInvokedThisRender.add(fnName);
       return "x".repeat(Math.max(1, Number(args[0] ?? 5)));
     case "uuidv4":
       _stubsInvokedThisRender.add("uuidv4");

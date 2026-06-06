@@ -69,17 +69,18 @@ export async function GET(request: Request) {
       valuesFiles.map(async (vf) => {
         const envName = extractEnvName(vf);
         try {
-          const rendered = await runHelmTemplate(CHART_DIR, "release", [vf]);
-          const resources = parseMultiDocYaml(rendered);
+          const { yaml: renderedYaml, jsRendererWarnings } = await runHelmTemplate(CHART_DIR, "release", [vf]);
+          const resources = parseMultiDocYaml(renderedYaml);
           const valuesYaml = await readFile(vf, "utf-8");
           const valuesTree = extractValuesEntries(valuesYaml, envName, templateFiles);
-          const graph = buildGraph(resources, rendered);
+          const graph = buildGraph(resources, renderedYaml);
 
           return {
             env: envName,
             valuesFile: path.basename(vf),
             resources,
-            renderedManifest: rendered,
+            renderedManifest: renderedYaml,
+            jsRendererWarnings,
             valuesTree,
             graph,
           } as EnvRenderResult & { graph: ReturnType<typeof buildGraph> };

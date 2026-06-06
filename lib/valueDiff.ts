@@ -3,7 +3,7 @@ import type {
   ValuesDiffEntry,
   ValuesDiffResult,
   ValuesDiffSummary,
-} from "@/types/helm";
+} from "../types/helm";
 
 /**
  * Compute a structured diff between two ValuesTree objects.

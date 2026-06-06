@@ -1,5 +1,5 @@
 import yaml from "js-yaml";
-import type { K8sResource, ValuesEntry, ValuesTree } from "@/types/helm";
+import type { K8sResource, ValuesEntry, ValuesTree } from "../types/helm";
 
 /**
  * Parse a multi-document YAML string (--- separated) into an array of K8sResource objects.
