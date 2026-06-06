@@ -48,6 +48,8 @@ Paste an Artifact Hub URL, upload a `.tgz` chart, or load the chart from your ow
 | **Pure-JS renderer** | Go templates processed entirely in-browser when Helm CLI unavailable — no server-side helm binary |
 | **AI Chat Assistant** | Floating chatbot panel — ask natural-language questions about the loaded chart's resources, values, and configuration |
 | **AI Suggestions Panel** | Flags high-impact defaults/override gaps (image tag pinning, replicaCount, resources) with apply / ignore / explain actions |
+| **Security Scanner** | Static security & best-practice analysis for rendered YAML (root container avoidance, resources limit validation, probe verification, etc.) with suggested fixes |
+| **Live Cluster Diff** | Compare local Helm rendered YAML directly with running resources in a live K8s cluster, highlighting synced, drifted, local-only, or orphaned resources |
 
 ---
 
@@ -238,6 +240,41 @@ The visualizer discovers all `values.<env>.yaml` files next to `values.yaml` and
 
 - Select the **active environment** to view its graph
 - Select a **diff environment** to compare — amber-highlighted nodes have changed resources
+
+---
+
+## Static Security & Best Practice Scanner
+
+The visualizer comes equipped with an offline, high-performance static analysis engine that scans your rendered Kubernetes resources for common configuration errors, security risks, and reliability anti-patterns:
+
+- **Privileged Access**: Detects containers running as privileged or mounting hostPaths.
+- **Root Context**: Highlights containers running without explicit `runAsNonRoot: true`.
+- **Resource Constraints**: Flags resources lacking CPU/Memory limits and requests.
+- **Reliability Probes**: Warns about Deployments/StatefulSets missing Liveness or Readiness probes.
+- **Service Mapping**: Verifies that Services contain valid selector configurations.
+- **Production Best Practices**: Warns when using the `:latest` tag in production environments.
+
+### Visual Cues & Fixes
+- **Visual Node Indicators**: Affected nodes on the graph display an alert badge. The node borders are colored dynamically based on the highest vulnerability found (**Red** for High, **Yellow** for Medium).
+- **Interactive Security Tab**: Selecting an affected node opens a "Security" tab in the detailed side panel. It itemizes every violation with clear rationale and provides a YAML code block under **Suggested Fix** that you can copy-paste to fix your templates.
+
+---
+
+## Live Cluster Diff
+
+Compare locally rendered Helm templates directly with resources deployed in a running Kubernetes cluster, without doing dry runs or deploying.
+
+- **Dynamic Sync Status**:
+  - `In Sync` (🟢 **Glowing Green Border + Live Sync Badge**): Deployed state exactly matches your local template (ignoring read-only runtime metadata).
+  - `Diff Detected` (🟡 **Glowing Amber Border + Diff Detected Badge**): Resource exists in the cluster but has configuration drift.
+  - `Local Only` (⚪ **Dashed Gray Border + Local Only Badge**): Resource is defined locally but doesn't exist in the cluster.
+  - `Orphaned` (🔴 **Dashed Red Border + Orphaned Badge**): Resource exists in the cluster/namespace but is completely missing from your local templates.
+- **Line-by-Line YAML Diff**: Selecting an out-of-sync node displays a "Live Diff" tab in the side panel. It renders a clean Git-style diff highlighting the exact lines that have changed.
+
+### Usage
+1. Enter your target namespace in the `NS:` input box in the header toolbar.
+2. Click **Live Cluster Diff**. It uses your local `kubeconfig` and `kubectl` to fetch the live state in parallel.
+3. Toggle it off at any time to return to the pure static rendering graph.
 
 ---
 
