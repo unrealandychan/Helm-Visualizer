@@ -431,11 +431,14 @@ function ChatMessage({ message }: { message: Message }) {
 
   useEffect(() => {
     if (!shouldRenderMarkdown) {
-      setDebouncedContent(message.content);
-      setIsContentSettling(false);
-      return;
+      const id = setTimeout(() => {
+        setDebouncedContent(message.content);
+        setIsContentSettling(false);
+      }, 0);
+      return () => clearTimeout(id);
     }
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsContentSettling(true);
     const timeoutId = window.setTimeout(() => {
       setDebouncedContent(message.content);

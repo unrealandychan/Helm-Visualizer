@@ -36,7 +36,7 @@ describe('yamlParser', () => {
       const doc = 'apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: test\ndata:\n  image: registry.com/name:\n';
       const result = parseMultiDocYaml(doc);
       expect(result).toHaveLength(1);
-      expect((result[0] as any).data.image).toBe('registry.com/name:');
+      expect((result[0] as unknown as { data: { image: string } }).data.image).toBe('registry.com/name:');
     });
 
     it('silently skips invalid documents in multi-document parsing', () => {
@@ -70,7 +70,7 @@ describe('yamlParser', () => {
 
       const tree = extractValuesEntries(valuesYaml, 'dev');
       expect(tree.env).toBe('dev');
-      expect((tree.raw as any).global.registry).toBe('docker.io');
+      expect((tree.raw as unknown as { global: { registry: string } }).global.registry).toBe('docker.io');
 
       const entryMap = new Map(tree.entries.map(e => [e.key, e]));
       expect(entryMap.get('global.registry')).toEqual({

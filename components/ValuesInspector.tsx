@@ -71,7 +71,11 @@ export function ValuesInspector({ valuesTree, onHighlightKey }: ValuesInspectorP
   function toggleGroup(key: string) {
     setExpanded((prev) => {
       const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
       return next;
     });
   }
@@ -123,7 +127,7 @@ export function ValuesInspector({ valuesTree, onHighlightKey }: ValuesInspectorP
               <GroupRow
                 key={group}
                 group={group}
-                children={children}
+                entries={children}
                 isOpen={isOpen}
                 selectedKey={selectedKey}
                 onToggle={toggleGroup}
@@ -139,14 +143,14 @@ export function ValuesInspector({ valuesTree, onHighlightKey }: ValuesInspectorP
 
 interface GroupRowProps {
   group: string;
-  children: ValuesEntry[];
+  entries: ValuesEntry[];
   isOpen: boolean;
   selectedKey: string | null;
   onToggle: (key: string) => void;
   onSelect: (key: string) => void;
 }
 
-function GroupRow({ group, children, isOpen, selectedKey, onToggle, onSelect }: GroupRowProps) {
+function GroupRow({ group, entries, isOpen, selectedKey, onToggle, onSelect }: GroupRowProps) {
   return (
     <div>
       <button
@@ -159,13 +163,13 @@ function GroupRow({ group, children, isOpen, selectedKey, onToggle, onSelect }: 
           <ChevronRight className="w-3 h-3 shrink-0" />
         )}
         <span className="font-bold text-zinc-100">{group}</span>
-        <span className="ml-auto text-zinc-600">{children.length}</span>
+        <span className="ml-auto text-zinc-600">{entries.length}</span>
       </button>
 
       {isOpen && (
         <div>
           <FlatList
-            entries={children}
+            entries={entries}
             indent
             selectedKey={selectedKey}
             onSelect={onSelect}

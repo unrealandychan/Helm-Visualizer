@@ -100,7 +100,9 @@ describe('valueDiff', () => {
       expect(data.summary.breaking).toBe(2);
       expect(data.changes).toHaveLength(4);
 
-      const changeMap = new Map<string, any>(data.changes.map((c: any) => [c.key, c]));
+      const changeMap = new Map<string, { key: string; status: string; from?: unknown; to?: unknown; typeChange?: string }>(
+        (data.changes as Array<{ key: string; status: string; from?: unknown; to?: unknown; typeChange?: string }>).map((c) => [c.key, c])
+      );
       expect(changeMap.get('newKey')?.status).toBe('added');
       expect(changeMap.get('newKey')?.to).toBe('hello');
 
