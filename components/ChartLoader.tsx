@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Upload, Globe, FolderOpen, Search, ChevronRight, AlertCircle, AlertTriangle, CheckCircle2, Clock, Zap, GitCompare, GitBranch } from "lucide-react";
+import { Upload, Globe, FolderOpen, Search, ChevronRight, AlertCircle, AlertTriangle, CheckCircle2, Clock, Zap, GitCompare, GitBranch, HardDrive } from "lucide-react";
 import clsx from "clsx";
 import yaml from "js-yaml";
 import type { ChartRenderResult, ArtifactHubPackage, ValidationIssue } from "@/types/helm";
@@ -11,7 +11,31 @@ import { computeValuesDiff } from "@/lib/valueDiff";
 import { EnvDiffPanel } from "@/components/EnvDiffPanel";
 import type { ValuesDiffResult } from "@/types/helm";
 
-type Tab = "workspace" | "upload" | "artifacthub" | "github" | "history" | "compare";
+type Tab = "workspace" | "upload" | "artifacthub" | "github" | "local" | "history" | "compare";
+
+const LOCAL_PATHS_KEY = "helm-viz-local-paths";
+const MAX_LOCAL_PATHS = 8;
+
+function loadRecentLocalPaths(): string[] {
+  try {
+    const raw = localStorage.getItem(LOCAL_PATHS_KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter((p): p is string => typeof p === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveRecentLocalPath(newPath: string): string[] {
+  const prev = loadRecentLocalPaths().filter((p) => p !== newPath);
+  const next = [newPath, ...prev].slice(0, MAX_LOCAL_PATHS);
+  try {
+    localStorage.setItem(LOCAL_PATHS_KEY, JSON.stringify(next));
+  } catch {
+    // Storage full/unavailable — keep going in-memory only.
+  }
+  return next;
+}
 
 const POPULAR_CHARTS = [
   { name: "nginx",      repo: "bitnami",      desc: "NGINX web server"            },
@@ -25,7 +49,7 @@ const POPULAR_CHARTS = [
 ];
 
 interface ChartLoaderProps {
-  onLoad: (result: ChartRenderResult, source: "workspace" | "upload" | "artifacthub" | "github", url?: string) => void;
+  onLoad: (result: ChartRenderResult, source: "workspace" | "upload" | "artifacthub" | "github" | "local", url?: string) => void;
   history?: HistoryEntry[];
   /** Called with true when a fetch starts, false when it ends — allows parent to show a rendering overlay. */
   onRenderingChange?: (rendering: boolean) => void;
@@ -57,6 +81,11 @@ export function ChartLoader({ onLoad, history = [], onRenderingChange }: ChartLo
   // GitHub import state
   const [gitUrl, setGitUrl] = useState("");
 
+  // Local directory import state
+  const [localPath, setLocalPath] = useState("");
+  const [recentLocalPaths, setRecentLocalPaths] = useState<string[]>([]);
+  const folderInputRef = useRef<HTMLInputElement>(null);
+
   // Compare tab state
   const [compareFileA, setCompareFileA] = useState<{ name: string; content: string } | null>(null);
   const [compareFileB, setCompareFileB] = useState<{ name: string; content: string } | null>(null);
@@ -74,6 +103,10 @@ export function ChartLoader({ onLoad, history = [], onRenderingChange }: ChartLo
     return () => {
       if (progressTimerRef.current) clearInterval(progressTimerRef.current);
     };
+  }, []);
+
+  useEffect(() => {
+    setRecentLocalPaths(loadRecentLocalPaths());
   }, []);
 
   async function loadWorkspaceChart() {
@@ -123,6 +156,27 @@ export function ChartLoader({ onLoad, history = [], onRenderingChange }: ChartLo
     );
   }
 
+  async function loadLocalChart(pathOverride?: string) {
+    const trimmedPath = (pathOverride ?? localPath).trim();
+    if (!trimmedPath) {
+      setError("Please enter a local directory path.");
+      return;
+    }
+    const ok = await fetchWithLoading(
+      () =>
+        fetch("/api/local-chart", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path: trimmedPath }),
+        }),
+      "local",
+      trimmedPath
+    );
+    if (ok) {
+      setRecentLocalPaths(saveRecentLocalPath(trimmedPath));
+    }
+  }
+
   async function searchArtifactHub() {
     if (ahSearch.trim().length < 2) return;
     setAhSearching(true);
@@ -168,7 +222,7 @@ export function ChartLoader({ onLoad, history = [], onRenderingChange }: ChartLo
     );
   }
 
-  async function fetchWithLoading(fn: () => Promise<Response>, source: "workspace" | "upload" | "artifacthub" | "github", url?: string) {
+  async function fetchWithLoading(fn: () => Promise<Response>, source: "workspace" | "upload" | "artifacthub" | "github" | "local", url?: string): Promise<boolean> {
     setLoading(true);
     onRenderingChange?.(true);
     setError(null);
@@ -191,7 +245,7 @@ export function ChartLoader({ onLoad, history = [], onRenderingChange }: ChartLo
       setProgressStep(PROGRESS_STEPS.length - 1); // jump to final step
       if (!res.ok) {
         setError(data.error ?? `HTTP ${res.status}`);
-        return;
+        return false;
       }
       const result = data as ChartRenderResult;
       // Surface any validation warnings (errors would have caused a non-ok response)
@@ -199,9 +253,11 @@ export function ChartLoader({ onLoad, history = [], onRenderingChange }: ChartLo
         setValidationIssues(result.validation.issues.filter((i) => i.level === "warning"));
       }
       onLoad(result, source, url);
+      return true;
     } catch (e) {
       if (progressTimerRef.current) clearInterval(progressTimerRef.current);
       setError(e instanceof Error ? e.message : "Request failed");
+      return false;
     } finally {
       setLoading(false);
       onRenderingChange?.(false);
@@ -266,7 +322,7 @@ export function ChartLoader({ onLoad, history = [], onRenderingChange }: ChartLo
     <div className="bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl w-full max-w-2xl mx-auto p-5">
       {/* Tabs */}
       <div className="flex gap-1 mb-5 bg-zinc-800 rounded-lg p-1">
-        {(["history", "workspace", "upload", "artifacthub", "github", "compare"] as Tab[]).map((tab) => (
+        {(["history", "workspace", "upload", "artifacthub", "github", "local", "compare"] as Tab[]).map((tab) => (
           <button
             key={tab}
             onClick={() => { setActiveTab(tab); setError(null); }}
@@ -282,11 +338,13 @@ export function ChartLoader({ onLoad, history = [], onRenderingChange }: ChartLo
             {tab === "upload"      && <Upload className="w-3 h-3" />}
             {tab === "artifacthub" && <Globe className="w-3 h-3" />}
             {tab === "github"      && <GitBranch className="w-3 h-3" />}
+            {tab === "local"       && <HardDrive className="w-3 h-3" />}
             {tab === "compare"     && <GitCompare className="w-3 h-3" />}
             {tab === "history"     ? "Recent" :
              tab === "workspace"   ? "Workspace" :
              tab === "upload"      ? "Upload" :
              tab === "github"      ? "GitHub" :
+             tab === "local"       ? "Local" :
              tab === "compare"     ? "Compare" : "Artifact Hub"}
             {tab === "history" && history.length > 0 && (
               <span className="bg-blue-600 text-white text-[9px] rounded-full px-1 leading-none py-0.5">
@@ -318,6 +376,7 @@ export function ChartLoader({ onLoad, history = [], onRenderingChange }: ChartLo
                   {entry.source === "upload"    && <Upload className="w-4 h-4 text-green-400 shrink-0" />}
                   {entry.source === "artifacthub" && <Globe className="w-4 h-4 text-yellow-400 shrink-0" />}
                   {entry.source === "github"    && <GitBranch className="w-4 h-4 text-purple-400 shrink-0" />}
+                  {entry.source === "local"     && <HardDrive className="w-4 h-4 text-orange-400 shrink-0" />}
                   <div className="min-w-0 flex-1">
                     <div className="text-white text-sm font-medium truncate">{entry.name}</div>
                     <div className="text-zinc-500 text-xs">
@@ -533,6 +592,62 @@ export function ChartLoader({ onLoad, history = [], onRenderingChange }: ChartLo
               </button>
             ))}
           </div>
+        </div>
+      )}
+
+      {activeTab === "local" && (
+        <div className="space-y-4">
+          <p className="text-xs text-zinc-400">
+            Load a Helm chart from a directory on this machine — the server reads the path
+            directly from disk.
+          </p>
+          <div>
+            <label className="text-xs text-zinc-400 mb-1 block">Chart Directory Path</label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="/path/to/my-chart"
+                value={localPath}
+                onChange={(e) => setLocalPath(e.target.value)}
+                className="flex-1 bg-zinc-800 border border-zinc-600 rounded-lg text-sm text-white px-3 py-2 outline-none focus:border-blue-500 placeholder-zinc-500"
+                onKeyDown={(e) => {
+                  if (e.key !== "Enter" || loading) return;
+                  e.preventDefault();
+                  loadLocalChart();
+                }}
+              />
+              <button
+                onClick={() => loadLocalChart()}
+                disabled={loading}
+                className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-1"
+              >
+                {loading ? "…" : <ChevronRight className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+
+          {recentLocalPaths.length > 0 && (
+            <div>
+              <p className="text-[11px] text-zinc-400 font-medium flex items-center gap-1 mb-1.5">
+                <HardDrive className="w-3 h-3" /> Recent paths
+              </p>
+              <div className="space-y-1 max-h-40 overflow-y-auto">
+                {recentLocalPaths.map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => {
+                      setLocalPath(p);
+                      loadLocalChart(p);
+                    }}
+                    disabled={loading}
+                    className="block w-full text-left text-[11px] text-zinc-500 hover:text-blue-400 disabled:opacity-50 truncate transition-colors"
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

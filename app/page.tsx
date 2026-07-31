@@ -45,7 +45,7 @@ export interface HistoryEntry {
   id: string;
   name: string;
   version: string;
-  source: "workspace" | "upload" | "artifacthub" | "github";
+  source: "workspace" | "upload" | "artifacthub" | "github" | "local";
   url?: string;
   loadedAt: string;
   /** Unix timestamp (ms) when the entry was saved. Used for TTL pruning. */
@@ -272,7 +272,7 @@ export default function Home() {
     localStorage.setItem(THEME_KEY, theme);
   }, [theme]);
 
-  const handleChartLoad = useCallback((result: ChartRenderResult, source: "workspace" | "upload" | "artifacthub" | "github" = "workspace", url?: string) => {
+  const handleChartLoad = useCallback((result: ChartRenderResult, source: "workspace" | "upload" | "artifacthub" | "github" | "local" = "workspace", url?: string) => {
     setChartResult(result);
     setActiveEnv(result.activeEnv);
     setDiffEnv(null);
